@@ -3,6 +3,7 @@
 from django.core import validators
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from jsonfield import JSONField
 from plp.models import Course, Instructor, User
 
 
@@ -53,3 +54,14 @@ class EducationalModuleEnrollment(models.Model):
         verbose_name = _(u'Запись на модуль')
         verbose_name_plural = _(u'Записи на модуль')
         unique_together = ('user', 'module')
+
+
+class EducationalModuleProgress(models.Model):
+    enrollment = models.OneToOneField(EducationalModuleEnrollment, verbose_name=_(u'Запись на модуль'),
+                                      related_name='progress')
+    progress = JSONField(verbose_name=_(u'Прогресс'), null=True)
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_(u'Время последнего обращения к edx'))
+
+    class Meta:
+        verbose_name = _(u'Прогресс по модулю')
+        verbose_name_plural = _(u'Прогресс по модулям')

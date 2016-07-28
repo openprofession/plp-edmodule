@@ -4,16 +4,8 @@ import logging
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
-from django.conf import settings
-from raven import Client
-from django.shortcuts import get_object_or_404
 from .models import EducationalModule, EducationalModuleEnrollment
-
-RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
-client = None
-
-if RAVEN_CONFIG:
-    client = Client(RAVEN_CONFIG.get('dsn'))
+from .utils import update_module_enrollment_progress, client
 
 
 @login_required
@@ -42,6 +34,8 @@ def edmodule_enroll(request):
                     return JsonResponse({'status': 1})
                 enrollment.is_active = is_active
                 enrollment.save()
+                if is_active:
+                    update_module_enrollment_progress(enrollment)
             except EducationalModuleEnrollment.DoesNotExist:
                 if not is_active:
                     if client:
@@ -51,9 +45,10 @@ def edmodule_enroll(request):
                         request.user.username, edmodule.code
                     ))
                     return JsonResponse({'status': 1})
-                EducationalModuleEnrollment.objects.create(
+                enr = EducationalModuleEnrollment.objects.create(
                     user=request.user, module=edmodule, is_active=is_active
                 )
+                update_module_enrollment_progress(enr)
             logging.info('User {} successfully {} educational module {}'.format(
                 request.user.username, 'enrolled in' if is_active else 'unenrolled from', edmodule.code
             ))
