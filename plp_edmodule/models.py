@@ -3,7 +3,7 @@
 from django.core import validators
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
-from plp.models import Course, Instructor
+from plp.models import Course, Instructor, User
 
 
 class EducationalModule(models.Model):
@@ -41,3 +41,15 @@ class EducationalModule(models.Model):
         return Instructor.objects.filter(instructor_courses=self.courses.all()).distinct()
 
     # TODO: категории
+    
+    
+class EducationalModuleEnrollment(models.Model):
+    user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
+    module = models.ForeignKey(EducationalModule, verbose_name=_(u'Образовательный модуль'))
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _(u'Запись на модуль')
+        verbose_name_plural = _(u'Записи на модуль')
+        unique_together = ('user', 'module')
