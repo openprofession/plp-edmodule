@@ -7,6 +7,7 @@ from plp.models import Course, Instructor
 
 
 class EducationalModule(models.Model):
+    code = models.SlugField(verbose_name=_(u'Код'), unique=True)
     courses = models.ManyToManyField(Course, verbose_name=_(u'Курсы'), related_name='education_modules')
     about = models.TextField(verbose_name=_(u'Описание'), blank=False)
     price = models.IntegerField(verbose_name=_(u'Стоимость'), blank=True, null=True)
