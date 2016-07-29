@@ -65,3 +65,13 @@ class EducationalModuleProgress(models.Model):
     class Meta:
         verbose_name = _(u'Прогресс по модулю')
         verbose_name_plural = _(u'Прогресс по модулям')
+
+
+class EducationalModuleUnsubscribe(models.Model):
+    user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
+    module = models.ForeignKey(EducationalModule, verbose_name=_(u'Образовательный модуль'))
+
+    class Meta:
+        verbose_name = _(u'Отписка от рассылок образовательного модуля')
+        verbose_name_plural = _(u'Отписки от рассылок образовательного модуля')
+        unique_together = ('user', 'module')
