@@ -5,6 +5,7 @@ from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from plp.models import Course, Instructor, User
+from plp_extension.apps.course_review.models import AbstractRating
 
 
 class EducationalModule(models.Model):
@@ -75,3 +76,9 @@ class EducationalModuleUnsubscribe(models.Model):
         verbose_name = _(u'Отписка от рассылок образовательного модуля')
         verbose_name_plural = _(u'Отписки от рассылок образовательного модуля')
         unique_together = ('user', 'module')
+
+
+class EducationalModuleRating(AbstractRating):
+    class Meta:
+        verbose_name = _(u'Отзыв о модуле')
+        verbose_name_plural = _(u'Отзывы о модуле')

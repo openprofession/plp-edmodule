@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-07-29 12:23+0300\n"
+"POT-Creation-Date: 2016-08-01 17:49+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -65,4 +65,10 @@ msgid "Отписка от рассылок образовательного м�
 msgstr ""
 
 msgid "Отписки от рассылок образовательного модуля"
+msgstr ""
+
+msgid "Отзыв о модуле"
+msgstr ""
+
+msgid "Отзывы о модуле"
 msgstr ""
