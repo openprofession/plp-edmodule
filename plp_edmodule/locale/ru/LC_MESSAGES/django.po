@@ -28,6 +28,9 @@ msgstr ""
 msgid "Курсы"
 msgstr ""
 
+msgid "Обложка"
+msgstr ""
+
 msgid "Описание"
 msgstr ""
 

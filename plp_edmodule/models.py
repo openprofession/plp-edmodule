@@ -14,6 +14,7 @@ class EducationalModule(models.Model):
     code = models.SlugField(verbose_name=_(u'Код'), unique=True)
     title = models.CharField(verbose_name=_(u'Название'), max_length=200)
     courses = models.ManyToManyField(Course, verbose_name=_(u'Курсы'), related_name='education_modules')
+    cover = models.ImageField(_(u'Обложка'), upload_to='edmodule_cover', blank=True)
     about = models.TextField(verbose_name=_(u'Описание'), blank=False)
     price = models.IntegerField(verbose_name=_(u'Стоимость'), blank=True, null=True)
     discount = models.IntegerField(verbose_name=_(u'Скидка'), blank=True, default=0, validators=[
