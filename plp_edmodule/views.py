@@ -81,3 +81,11 @@ def module_page(request, code):
     module = get_object_or_404(EducationalModule, code=code)
     # TODO: module template
     return render(request, '', {'module': module})
+
+
+def update_context_with_modules(context, user):
+    if user.is_authenticated():
+        modules = EducationalModule.objects.filter(educationalmoduleenrollment__user=user).distinct().order_by('title')
+    else:
+        modules = EducationalModule.objects.none()
+    context['modules'] = modules

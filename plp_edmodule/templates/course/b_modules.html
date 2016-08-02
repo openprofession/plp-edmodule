@@ -1,0 +1,35 @@
+{% load imagekit %}
+{% load staticfiles %}
+{% load html_helpers %}
+{% load i18n %}
+
+  {% for m in modules %}
+    <div class="col-md-12 my-cources-list">
+      <div class="course">
+      <div class="row">
+        <div class="col-md-4 col-sm-12 col-xs-12">
+          {% if m.cover and m.cover|file_exists %}
+            {% generateimage 'imagekit:thumbnail' source=m.cover width=275 height=155 as img %}<img src="{{ img.url }}" class="course-image" />
+          {% else %}
+            <img src="{% static 'img/course-image2.jpg' %}" class="course-image">
+          {% endif %}
+        </div>
+        <div class="col-md-8 col-sm-12 col-xs-12">
+          <div class="course-title">
+            <a href="{% url 'edmodule-page' code=m.code %}">{{ m.title }}</a>
+          </div>
+          <div>
+            <h4>{% blocktrans %}Курсы{% endblocktrans %}</h4>
+            <ul>
+            {% for c in m.courses.all %}
+              <li>
+                <a href="{% url 'course_details' uni_slug=c.university.slug slug=c.slug %}">{{ c.title }}</a>
+              </li>
+            {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  {% endfor %}
