@@ -33,3 +33,12 @@ class EdmoduleCourseStartsEmails(MassSendEmails):
             'course': self.session.course,
             'site': self.get_site()
         }
+
+
+class EdmoduleCourseEnrollEndsEmails(EdmoduleCourseStartsEmails):
+    """
+    Класс для массовой рассылки сообщений о конце записи на курс, на который пользователь не записан,
+    из образовательного модуля, на который он записан.
+    """
+    template_html = 'emails/edmodule_course_enroll_ends_html.html'
+    template_subject = 'emails/edmodule_course_enroll_ends_subject.txt'

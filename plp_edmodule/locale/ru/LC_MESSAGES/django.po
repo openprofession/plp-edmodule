@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-08-02 20:36+0300\n"
+"POT-Creation-Date: 2016-08-02 21:36+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -126,14 +126,24 @@ msgstr ""
 
 #, python-format
 msgid ""
-"%(name)s, стартует обучение на одном из курсов специализации \"%(title)s\", "
-"на которую вы записаны."
+"%(name)s, в течение недели заканчивается запись на один из курсов "
+"специализации \"%(title)s\", который вы пока не проходили."
 msgstr ""
 
 #, python-format
 msgid ""
 "Записаться на прохождение курса \"%(title)s\" вы можете здесь: <a href="
 "\"%(site)s%(url)s\">%(site)s%(url)s</a>"
+msgstr ""
+
+#, python-format
+msgid "Заканчивается запись на курс \"%(title)s\" вашей специализации"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(name)s, стартует обучение на одном из курсов специализации \"%(title)s\", "
+"на которую вы записаны."
 msgstr ""
 
 #, python-format
@@ -176,10 +186,7 @@ msgid "Оплата специализации \"%(title)s\""
 msgstr ""
 
 #, python-format
-msgid ""
-"\n"
-"    %(name)s, вы отписались от специализации %(title)s.\n"
-"    "
+msgid "%(name)s, вы отписались от специализации %(title)s."
 msgstr ""
 
 #, python-format
