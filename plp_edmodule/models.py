@@ -82,3 +82,51 @@ class EducationalModuleRating(AbstractRating):
     class Meta:
         verbose_name = _(u'Отзыв о модуле')
         verbose_name_plural = _(u'Отзывы о модуле')
+
+
+class EducationalModuleEnrollmentType(models.Model):
+    EDX_MODES = (
+        ('audit', 'audit'),
+        ('honor', 'honor'),
+        ('verified', 'verified')
+    )
+
+    module = models.ForeignKey(EducationalModule, verbose_name=_(u'Образовательный модуль'))
+    active = models.BooleanField(_(u'Активен'), default=True)
+    mode = models.CharField(_(u'Тип'), max_length=32, choices=EDX_MODES, blank=True, help_text=_(u'course mode в edx'))
+    buy_start = models.DateTimeField(_(u'Начало приема оплаты'), null=True, blank=True)
+    buy_expiration = models.DateField(_(u'Крайняя дата оплаты'), null=True, blank=True)
+    price = models.PositiveIntegerField(_(u'Стоимость'), default=0)
+    about = models.TextField(_(u'Краткое описание'), blank=True)
+    description = models.TextField(_(u'Описание'), blank=True)
+
+    class Meta:
+        verbose_name = _(u'Вариант прохождения модуля')
+        verbose_name_plural = _(u'Варианты прохождения модуля')
+        unique_together = (("module", "mode"),)
+
+
+class EducationalModuleEnrollmentReason(models.Model):
+    class PAYMENT_TYPE:
+        MANUAL = 'manual'
+        YAMONEY = 'yamoney'
+        OTHER = 'other'
+        CHOICES = [(v, v) for v in (MANUAL, YAMONEY, OTHER)]
+
+    CHOICES = [(None, '')] + PAYMENT_TYPE.CHOICES
+    enrollment = models.ForeignKey(EducationalModuleEnrollment, verbose_name=_(u'Запись на модуль'),
+                                   related_name='enrollment_reason')
+    module_enrollment_type = models.ForeignKey(EducationalModuleEnrollmentType,
+                                               verbose_name=_(u'Вариант прохождения модуля'))
+    payment_type = models.CharField(max_length=16, null=True, default=None, choices=CHOICES,
+                                    verbose_name=_(u'Способ платежа'))
+    payment_order_id = models.CharField(max_length=64, null=True, blank=True,
+                                        help_text=_(u'Номер договора (для яндекс-кассы - поле order_number)'),
+                                        verbose_name=_(u'Номер договора'))
+    payment_descriptions = models.TextField(null=True, blank=True, help_text=_(u'Комментарий к платежу'),
+                                            verbose_name=_(u'Описание платежа'))
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _(u'Причина записи')
+        verbose_name_plural = _(u'Причины записи')

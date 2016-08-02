@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-08-01 17:49+0300\n"
+"POT-Creation-Date: 2016-08-02 12:22+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -71,4 +71,49 @@ msgid "Отзыв о модуле"
 msgstr ""
 
 msgid "Отзывы о модуле"
+msgstr ""
+
+msgid "Активен"
+msgstr ""
+
+msgid "Тип"
+msgstr ""
+
+msgid "course mode в edx"
+msgstr ""
+
+msgid "Начало приема оплаты"
+msgstr ""
+
+msgid "Крайняя дата оплаты"
+msgstr ""
+
+msgid "Краткое описание"
+msgstr ""
+
+msgid "Вариант прохождения модуля"
+msgstr ""
+
+msgid "Варианты прохождения модуля"
+msgstr ""
+
+msgid "Способ платежа"
+msgstr ""
+
+msgid "Номер договора (для яндекс-кассы - поле order_number)"
+msgstr ""
+
+msgid "Номер договора"
+msgstr ""
+
+msgid "Комментарий к платежу"
+msgstr ""
+
+msgid "Описание платежа"
+msgstr ""
+
+msgid "Причина записи"
+msgstr ""
+
+msgid "Причины записи"
 msgstr ""
