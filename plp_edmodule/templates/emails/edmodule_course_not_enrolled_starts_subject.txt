@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktrans with title=course.title %}Стартует курс специализации, на которую вы записаны: "{{ title }}"{% endblocktrans %}

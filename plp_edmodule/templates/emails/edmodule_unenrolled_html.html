@@ -1,0 +1,6 @@
+{% load i18n %}
+<p>
+    {% blocktrans trimmed with name=user.first_name|capfirst title=module.title %}
+    {{ name }}, вы отписались от специализации {{ title }}.
+    {% endblocktrans %}
+</p>

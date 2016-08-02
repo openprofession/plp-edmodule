@@ -24,7 +24,7 @@ class EDXTimeoutError(EDXEnrollmentError):
 
 class EDXEnrollmentExtension(EDXEnrollment):
     def request(self, path, method='GET', **kwargs):
-        url = self.base_url + path
+        url = '%s%s' % (self.base_url, path)
 
         headers = kwargs.setdefault('headers', {})
 

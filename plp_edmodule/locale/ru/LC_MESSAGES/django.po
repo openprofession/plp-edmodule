@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-08-02 12:22+0300\n"
+"POT-Creation-Date: 2016-08-02 20:36+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -20,6 +20,9 @@ msgstr ""
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 msgid "Код"
+msgstr ""
+
+msgid "Название"
 msgstr ""
 
 msgid "Курсы"
@@ -116,4 +119,66 @@ msgid "Причина записи"
 msgstr ""
 
 msgid "Причины записи"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(name)s, стартует обучение на одном из курсов специализации \"%(title)s\", "
+"на которую вы записаны."
+msgstr ""
+
+#, python-format
+msgid ""
+"Записаться на прохождение курса \"%(title)s\" вы можете здесь: <a href="
+"\"%(site)s%(url)s\">%(site)s%(url)s</a>"
+msgstr ""
+
+#, python-format
+msgid "Стартует курс специализации, на которую вы записаны: \"%(title)s\""
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"    %(name)s, спасибо, что зарегистрировались на специализацию \"%(title)s"
+"\".\n"
+"    "
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"    Чтобы начать обучение - выберите один из курсов и запишитесь на него на "
+"странице специализации:\n"
+"    <a href=\"%(site)s%(url)s\">%(site)s%(url)s</a>\n"
+"    "
+msgstr ""
+
+#, python-format
+msgid "Добро пожаловать на специализацию \"%(title)s\""
+msgstr ""
+
+#, python-format
+msgid "%(name)s, спасибо, что оплатили специализацию \"%(title)s\"."
+msgstr ""
+
+#, python-format
+msgid ""
+"Чтобы начать обучение перейдите на страницу специализации: <a href=\"%(site)s"
+"%(url)s\">%(site)s%(url)s</a>"
+msgstr ""
+
+#, python-format
+msgid "Оплата специализации \"%(title)s\""
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"    %(name)s, вы отписались от специализации %(title)s.\n"
+"    "
+msgstr ""
+
+#, python-format
+msgid "Вы отписаны от специализации \"%(title)s\""
 msgstr ""

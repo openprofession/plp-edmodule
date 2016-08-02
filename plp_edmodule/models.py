@@ -6,10 +6,13 @@ from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from plp.models import Course, Instructor, User
 from plp_extension.apps.course_review.models import AbstractRating
+from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_payed, edmodule_payed_handler, \
+    edmodule_unenrolled, edmodule_unenrolled_handler
 
 
 class EducationalModule(models.Model):
     code = models.SlugField(verbose_name=_(u'Код'), unique=True)
+    title = models.CharField(verbose_name=_(u'Название'), max_length=200)
     courses = models.ManyToManyField(Course, verbose_name=_(u'Курсы'), related_name='education_modules')
     about = models.TextField(verbose_name=_(u'Описание'), blank=False)
     price = models.IntegerField(verbose_name=_(u'Стоимость'), blank=True, null=True)
@@ -130,3 +133,8 @@ class EducationalModuleEnrollmentReason(models.Model):
     class Meta:
         verbose_name = _(u'Причина записи')
         verbose_name_plural = _(u'Причины записи')
+
+
+edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
+edmodule_unenrolled.connect(edmodule_unenrolled_handler, sender=EducationalModuleEnrollment)
+edmodule_payed.connect(edmodule_payed_handler, sender=EducationalModuleEnrollmentReason)
