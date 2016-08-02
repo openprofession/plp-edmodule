@@ -13,6 +13,9 @@ from .signals import edmodule_enrolled
 @login_required
 @require_POST
 def edmodule_enroll(request):
+    """
+    обработка подписки и отписки от образовательного модуля
+    """
     ed_module_code = request.POST.get('ed_module_code', '')
     try:
         is_active = request.POST['is_active'] in ['true', 'True', True]
@@ -72,6 +75,9 @@ def edmodule_enroll(request):
 
 
 def module_page(request, code):
+    """
+    страница образовательного модуля
+    """
     module = get_object_or_404(EducationalModule, code=code)
     # TODO: module template
     return render(request, '', {'module': module})

@@ -12,6 +12,10 @@ edmodule_payed = Signal(providing_args=['instance'])
 
 
 def edmodule_enrolled_handler(**kwargs):
+    """
+    Отправка сообщения об успешной записи на модуль
+    instace - EducationalModuleEnrollment
+    """
     instance = kwargs.get('instance')
     if instance:
         user = instance.user
@@ -44,6 +48,10 @@ def edmodule_unenrolled_handler(**kwargs):
 
 
 def edmodule_payed_handler(**kwargs):
+    """
+    отправка сообщения об успешной оплате модуля
+    instance - EducationalModuleEnrollmentReason
+    """
     instance = kwargs.get('instance')
     if instance:
         module = instance.enrollment.module

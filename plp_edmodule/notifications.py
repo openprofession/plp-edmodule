@@ -5,6 +5,10 @@ from .models import EducationalModule, EducationalModuleEnrollment
 
 
 class EdmoduleCourseStartsEmails(MassSendEmails):
+    """
+    Класс для массовой рассылки сообщений о начале курса, на который пользователь не записан,
+    из образовательного модуля, на который он записан.
+    """
     template_html = 'emails/edmodule_course_not_enrolled_starts_html.html'
     template_subject = 'emails/edmodule_course_not_enrolled_starts_subject.txt'
 

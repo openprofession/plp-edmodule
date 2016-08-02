@@ -9,6 +9,10 @@ from .notifications import EdmoduleCourseStartsEmails
 
 @periodic_task(run_every=crontab(minute=0, hour=0))
 def send_notification_module_course_starts():
+    """
+    периодическая проверка курсов, которые стартуют и отправка сообщений пользователям,
+    которые не записаны на курс, который входит в модуль, на который они записаны
+    """
     now = timezone.now()
     qs = CourseSession.objects.filter(datetime_starts__range=(
         timezone.make_aware(timezone.datetime.combine(now, timezone.datetime.min.time())),

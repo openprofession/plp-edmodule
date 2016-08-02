@@ -23,6 +23,9 @@ class EDXTimeoutError(EDXEnrollmentError):
 
 
 class EDXEnrollmentExtension(EDXEnrollment):
+    """
+    расширение класса EDXEnrollment с обработкой таймаута
+    """
     def request(self, path, method='GET', **kwargs):
         url = '%s%s' % (self.base_url, path)
 
@@ -87,6 +90,9 @@ class EDXEnrollmentExtension(EDXEnrollment):
 
 
 def update_module_enrollment_progress(enrollment):
+    """
+    обновление прогресса из edx по сессиям курсов, входящих в модуль, на который записан пользователь
+    """
     module = enrollment.module
     sessions = CourseSession.objects.filter(course__in=module.courses.all())
     course_ids = [s.get_absolute_slug_v1() for s in sessions if s.course_status().get('code') == 'started']
