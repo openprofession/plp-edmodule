@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
+from plp.models import HonorCode, CourseSession
 from .models import EducationalModule, EducationalModuleEnrollment
 from .utils import update_module_enrollment_progress, client
 from .signals import edmodule_enrolled
@@ -79,8 +80,26 @@ def module_page(request, code):
     страница образовательного модуля
     """
     module = get_object_or_404(EducationalModule, code=code)
-    # TODO: module template
-    return render(request, '', {'module': module})
+    return render(request, 'edmodule/edmodule_page.html', {
+        'object': module,
+        'courses': module.courses.all(),
+        'authenticated': request.user.is_authenticated(),
+    })
+
+
+@require_POST
+@login_required
+def get_honor_text(request):
+    course_id = request.POST.get('course_id')
+    split = course_id.split('/')
+    honor_text = ''
+    if len(split) == 3:
+        session = get_object_or_404(CourseSession,
+                                    course__university__slug=split[0],
+                                    course__slug=split[1],
+                                    slug=split[2])
+        honor_text = HonorCode.objects.get_text_for_session(session)
+    return JsonResponse({'honor_text': honor_text})
 
 
 def update_context_with_modules(context, user):
