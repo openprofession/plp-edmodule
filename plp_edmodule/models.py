@@ -52,8 +52,11 @@ class EducationalModule(models.Model):
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
     module = models.ForeignKey(EducationalModule, verbose_name=_(u'Образовательный модуль'))
+    is_paid = models.BooleanField(verbose_name=_(u'Прохождение оплачено'), default=False)
+    is_graduated = models.BooleanField(verbose_name=_(u'Прохождение завершено'), default=False)
     is_active = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    _ctime = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = _(u'Запись на модуль')
