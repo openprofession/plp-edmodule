@@ -1,0 +1,13 @@
+{% load i18n %}
+<p>
+    {% blocktrans trimmed with name=user.first_name|capfirst title=module.title %}
+    {{ name }}, спасибо, что оплатили специализацию "{{ title }}".
+    {% endblocktrans %}
+</p>
+{% url 'edmodule-page' code=module.code as url %}
+<p>
+    {% blocktrans trimmed %}
+    Чтобы начать обучение перейдите на страницу специализации:
+    <a href="{{ site }}{{ url }}">{{ site }}{{ url }}</a>
+    {% endblocktrans %}
+</p>

@@ -1,0 +1,13 @@
+{% load i18n %}
+<p>
+    {% blocktrans trimmed with name=user.first_name|capfirst title=module.title %}
+    {{ name }}, стартует обучение на одном из курсов специализации "{{ title }}", на которую вы записаны.
+    {% endblocktrans %}
+</p>
+{% url 'course_details' uni_slug=course.university.slug slug=course.slug as url %}
+<p>
+    {% blocktrans trimmed with title=course.title %}
+    Записаться на прохождение курса "{{ title }}" вы можете здесь:
+    <a href="{{ site }}{{ url }}">{{ site }}{{ url }}</a>
+    {% endblocktrans %}
+</p>

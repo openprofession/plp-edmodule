@@ -1,0 +1,13 @@
+{% load i18n %}
+<p>
+    {% blocktrans with name=user.first_name|capfirst title=module.title %}
+    {{ name }}, спасибо, что зарегистрировались на специализацию "{{ title }}".
+    {% endblocktrans %}
+</p>
+{% url 'edmodule-page' code=module.code as url %}
+<p>
+    {% blocktrans %}
+    Чтобы начать обучение - выберите один из курсов и запишитесь на него на странице специализации:
+    <a href="{{ site }}{{ url }}">{{ site }}{{ url }}</a>
+    {% endblocktrans %}
+</p>

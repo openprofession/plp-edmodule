@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktrans with title=course.title %}Заканчивается запись на курс "{{ title }}" вашей специализации{% endblocktrans %}

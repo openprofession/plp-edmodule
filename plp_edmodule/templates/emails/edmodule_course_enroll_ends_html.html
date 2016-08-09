@@ -1,0 +1,14 @@
+{% load i18n %}
+<p>
+    {% blocktrans trimmed with name=user.first_name|capfirst title=module.title %}
+    {{ name }}, в течение недели заканчивается запись на один из курсов специализации "{{ title }}",
+    который вы пока не проходили.
+    {% endblocktrans %}
+</p>
+{% url 'course_details' uni_slug=course.university.slug slug=course.slug as url %}
+<p>
+    {% blocktrans trimmed with title=course.title %}
+    Записаться на прохождение курса "{{ title }}" вы можете здесь:
+    <a href="{{ site }}{{ url }}">{{ site }}{{ url }}</a>
+    {% endblocktrans %}
+</p>

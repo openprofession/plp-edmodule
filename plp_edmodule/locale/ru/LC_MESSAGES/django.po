@@ -1,0 +1,200 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2016-08-05 17:45+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid "Код"
+msgstr ""
+
+msgid "Название"
+msgstr ""
+
+msgid "Курсы"
+msgstr ""
+
+msgid "Обложка"
+msgstr ""
+
+msgid "Описание"
+msgstr ""
+
+msgid "Стоимость"
+msgstr ""
+
+msgid "Скидка"
+msgstr ""
+
+msgid "Образовательный модуль"
+msgstr ""
+
+msgid "Образовательные модули"
+msgstr ""
+
+msgid "Пользователь"
+msgstr ""
+
+msgid "Прохождение оплачено"
+msgstr ""
+
+msgid "Прохождение завершено"
+msgstr ""
+
+msgid "Запись на модуль"
+msgstr ""
+
+msgid "Записи на модуль"
+msgstr ""
+
+msgid "Прогресс"
+msgstr ""
+
+msgid "Время последнего обращения к edx"
+msgstr ""
+
+msgid "Прогресс по модулю"
+msgstr ""
+
+msgid "Прогресс по модулям"
+msgstr ""
+
+msgid "Отписка от рассылок образовательного модуля"
+msgstr ""
+
+msgid "Отписки от рассылок образовательного модуля"
+msgstr ""
+
+msgid "Отзыв о модуле"
+msgstr ""
+
+msgid "Отзывы о модуле"
+msgstr ""
+
+msgid "Активен"
+msgstr ""
+
+msgid "Тип"
+msgstr ""
+
+msgid "course mode в edx"
+msgstr ""
+
+msgid "Начало приема оплаты"
+msgstr ""
+
+msgid "Крайняя дата оплаты"
+msgstr ""
+
+msgid "Краткое описание"
+msgstr ""
+
+msgid "Вариант прохождения модуля"
+msgstr ""
+
+msgid "Варианты прохождения модуля"
+msgstr ""
+
+msgid "Способ платежа"
+msgstr ""
+
+msgid "Номер договора (для яндекс-кассы - поле order_number)"
+msgstr ""
+
+msgid "Номер договора"
+msgstr ""
+
+msgid "Комментарий к платежу"
+msgstr ""
+
+msgid "Описание платежа"
+msgstr ""
+
+msgid "Причина записи"
+msgstr ""
+
+msgid "Причины записи"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(name)s, в течение недели заканчивается запись на один из курсов "
+"специализации \"%(title)s\", который вы пока не проходили."
+msgstr ""
+
+#, python-format
+msgid ""
+"Записаться на прохождение курса \"%(title)s\" вы можете здесь: <a href="
+"\"%(site)s%(url)s\">%(site)s%(url)s</a>"
+msgstr ""
+
+#, python-format
+msgid "Заканчивается запись на курс \"%(title)s\" вашей специализации"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(name)s, стартует обучение на одном из курсов специализации \"%(title)s\", "
+"на которую вы записаны."
+msgstr ""
+
+#, python-format
+msgid "Стартует курс специализации, на которую вы записаны: \"%(title)s\""
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"    %(name)s, спасибо, что зарегистрировались на специализацию \"%(title)s"
+"\".\n"
+"    "
+msgstr ""
+
+#, python-format
+msgid ""
+"\n"
+"    Чтобы начать обучение - выберите один из курсов и запишитесь на него на "
+"странице специализации:\n"
+"    <a href=\"%(site)s%(url)s\">%(site)s%(url)s</a>\n"
+"    "
+msgstr ""
+
+#, python-format
+msgid "Добро пожаловать на специализацию \"%(title)s\""
+msgstr ""
+
+#, python-format
+msgid "%(name)s, спасибо, что оплатили специализацию \"%(title)s\"."
+msgstr ""
+
+#, python-format
+msgid ""
+"Чтобы начать обучение перейдите на страницу специализации: <a href=\"%(site)s"
+"%(url)s\">%(site)s%(url)s</a>"
+msgstr ""
+
+#, python-format
+msgid "Оплата специализации \"%(title)s\""
+msgstr ""
+
+#, python-format
+msgid "%(name)s, вы отписались от специализации %(title)s."
+msgstr ""
+
+#, python-format
+msgid "Вы отписаны от специализации \"%(title)s\""
+msgstr ""
