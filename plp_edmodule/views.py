@@ -2,10 +2,10 @@
 
 import logging
 from django.http import JsonResponse, Http404
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
-from plp.models import HonorCode, CourseSession
+from plp.models import HonorCode, CourseSession, Course
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
 from .utils import update_module_enrollment_progress, client
 from .signals import edmodule_enrolled
@@ -110,3 +110,30 @@ def update_context_with_modules(context, user):
     else:
         modules = EducationalModule.objects.none()
     context['modules'] = modules
+
+
+@require_GET
+def edmodule_filter_view(request):
+    """
+    фильтрация курсов и образовательных модулей
+    возвращает словарь с ключами
+    courses: список списков [код курса, код вуза]
+    modules: список кодов образовательных модулей
+    """
+    courses = Course.objects.filter(status=PUBLISHED)
+    modules = EducationalModule.objects.filter(status=PUBLISHED)
+    # допустимые для фильтрации значения и функции фильтрации
+    filters = {
+        'university_slug': lambda x, cs: cs.filter(university__slug__in=x)
+    }
+    for k in request.GET.keys():
+        if k in filters:
+            fn = filters[k]
+            courses = fn(request.GET.getlist(k), courses)
+    courses = courses.distinct()
+    modules = modules.filter(courses__in=courses).distinct()
+    result = {
+        'courses': [[i.slug, i.university.slug] for i in courses],
+        'modules': [i.code for i in modules]
+    }
+    return JsonResponse(result)
