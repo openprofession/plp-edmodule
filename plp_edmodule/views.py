@@ -1,12 +1,12 @@
 # coding: utf-8
 
 import logging
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
 from plp.models import HonorCode, CourseSession
-from .models import EducationalModule, EducationalModuleEnrollment
+from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
 from .utils import update_module_enrollment_progress, client
 from .signals import edmodule_enrolled
 
@@ -80,6 +80,8 @@ def module_page(request, code):
     страница образовательного модуля
     """
     module = get_object_or_404(EducationalModule, code=code)
+    if module.status == HIDDEN and not request.user.is_staff:
+        raise Http404
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
         'courses': module.courses.all(),
