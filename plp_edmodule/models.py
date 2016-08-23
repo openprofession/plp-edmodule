@@ -9,10 +9,18 @@ from plp_extension.apps.course_review.models import AbstractRating
 from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_payed, edmodule_payed_handler, \
     edmodule_unenrolled, edmodule_unenrolled_handler
 
+HIDDEN = 'hidden'
+PUBLISHED = 'published'
+
 
 class EducationalModule(models.Model):
+    STATUSES = (
+        (HIDDEN, _(u'Скрыт')),
+        (PUBLISHED, _(u'Опубликован')),
+    )
     code = models.SlugField(verbose_name=_(u'Код'), unique=True)
     title = models.CharField(verbose_name=_(u'Название'), max_length=200)
+    status = models.CharField(_(u'Статус'), max_length=16, choices=STATUSES, default='hidden')
     courses = models.ManyToManyField(Course, verbose_name=_(u'Курсы'), related_name='education_modules')
     cover = models.ImageField(_(u'Обложка'), upload_to='edmodule_cover', blank=True)
     about = models.TextField(verbose_name=_(u'Описание'), blank=False)
