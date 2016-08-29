@@ -1,11 +1,15 @@
 # coding: utf-8
 
+import random
 from django.core import validators
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
-from plp.models import Course, Instructor, User
+from sortedm2m.fields import SortedManyToManyField
+from plp.models import Course, User, SessionEnrollmentType
 from plp_extension.apps.course_review.models import AbstractRating
+from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
+from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_payed, edmodule_payed_handler, \
     edmodule_unenrolled, edmodule_unenrolled_handler
 
@@ -21,7 +25,7 @@ class EducationalModule(models.Model):
     code = models.SlugField(verbose_name=_(u'Код'), unique=True)
     title = models.CharField(verbose_name=_(u'Название'), max_length=200)
     status = models.CharField(_(u'Статус'), max_length=16, choices=STATUSES, default='hidden')
-    courses = models.ManyToManyField(Course, verbose_name=_(u'Курсы'), related_name='education_modules')
+    courses = SortedManyToManyField(Course, verbose_name=_(u'Курсы'), related_name='education_modules')
     cover = models.ImageField(_(u'Обложка'), upload_to='edmodule_cover', blank=True)
     about = models.TextField(verbose_name=_(u'Описание'), blank=False)
     price = models.IntegerField(verbose_name=_(u'Стоимость'), blank=True, null=True)
@@ -29,13 +33,15 @@ class EducationalModule(models.Model):
         validators.MinValueValidator(0),
         validators.MaxValueValidator(100)
     ])
+    sum_ratings = models.PositiveIntegerField(verbose_name=_(u'Сумма оценок'), default=0)
+    count_ratings = models.PositiveIntegerField(verbose_name=_(u'Количество оценок'), default=0)
 
     class Meta:
         verbose_name = _(u'Образовательный модуль')
         verbose_name_plural = _(u'Образовательные модули')
 
     def __unicode__(self):
-        return ', '.join(self.courses.values_list('slug', flat=True)) or self.about[:20]
+        return u'%s - %s' % (self.code, ', '.join(self.courses.values_list('slug', flat=True)))
 
     @property
     def duration(self):
@@ -51,12 +57,134 @@ class EducationalModule(models.Model):
     def instructors(self):
         """
         объединение множества преподавателей всех курсов модуля
+        упорядочивание по частоте вхождения в сессии, на которые мы записываем пользователя
         """
-        return Instructor.objects.filter(instructor_courses=self.courses.all()).distinct()
+        d = {}
+        for c in self.courses.all():
+            if c.next_session:
+                for i in c.next_session.get_instructors():
+                    d[i] = d.get(i, 0) + 1
+            else:
+                for i in c.instructor.all():
+                    d[i] = d.get(i, 0) + 1
+        result = sorted(d.items(), key=lambda x: x[1], reverse=True)
+        return [i[0] for i in result]
 
-    # TODO: категории
-    
-    
+    @property
+    def categories(self):
+        return self._get_sorted('categories')
+
+    def get_authors(self):
+        return self._get_sorted('authors')
+
+    def get_partners(self):
+        return self._get_sorted('partners')
+
+    def _get_sorted(self, attr):
+        d = {}
+        for c in self.courses_extended.prefetch_related(attr):
+            for item in getattr(c, attr).all():
+                d[item] = d.get(item, 0) + 1
+        result = sorted(d.items(), key=lambda x: x[1], reverse=True)
+        return [i[0] for i in result]
+
+    def get_schedule(self):
+        """
+        список тем
+        """
+        schedule = []
+        all_courses = self.courses.values_list('id', flat=True)
+        for c in self.courses_extended.prefetch_related('course'):
+            if c.course.id not in all_courses:
+                schedule.append({'course': {'title': c.course.title},
+                                 'schedule': ''})
+            else:
+                schedule.append({'course': {'title': c.course.title},
+                                 'schedule': c.themes})
+        return schedule
+
+    def get_rating(self):
+        if self.count_ratings:
+            return round(float(self.sum_ratings) / self.count_ratings, 2)
+        return 0
+
+    def get_related(self):
+        """
+        получение похожих курсов и специализаций (от 0 до 2)
+        """
+        categories = self.categories
+        if not categories:
+            return []
+        modules = EducationalModule.objects.exclude(id=self.id).filter(
+            courses__extended_params__categories__in=categories).distinct()
+        courses = Course.objects.exclude(id__in=self.courses.values_list('id', flat=True)).filter(
+            extended_params__categories__in=categories).distinct()
+        if modules:
+            return [{'type': 'em', 'item': random.sample(modules, 1)[0]},
+                    {'type': 'course', 'item': random.sample(courses, 1)[0]}]
+        elif courses:
+            if len(courses) > 1:
+                sample = random.sample(courses, 2)
+                return [{'type': 'course', 'item': sample[0]},
+                        {'type': 'course', 'item': sample[1]}]
+            return [{'type': 'course', 'item': courses[0]}]
+        return []
+
+    def get_sessions(self):
+        """
+        хелпер для выбора сессий
+        """
+        return [i.next_session for i in self.courses.all()]
+
+    @property
+    def courses_extended(self):
+        return CourseExtendedParameters.objects.filter(course__id__in=self.courses.values_list('id', flat=True))
+
+    def get_module_profit(self):
+        """ для блока "что я получу в итоге" """
+        data = []
+        for c in self.courses_extended:
+            if c.profit:
+                data.extend(c.profit.splitlines())
+        data = [i.strip() for i in data if i.strip()]
+        return list(set(data))
+
+    def get_price_list(self):
+        """
+        :return: {
+            'courses': [(курс(Course), цена(int), ...],
+            'price': цена без скидок (int),
+            'whole_price': цена со скидкой (float),
+            'discount': скидка (int)
+        }
+        """
+        types = dict([(i.session.id, i.price) for i in
+                      SessionEnrollmentType.objects.filter(session__course__in=self.courses.all(), mode='verified')])
+        result = {'courses': []}
+        for c in self.courses.all():
+            s = c.next_session
+            if s:
+                result['courses'].append((c, types.get(s.id)))
+            else:
+                result['courses'].append((c, None))
+        try:
+            price = sum([i[0] for i in result['courses']])
+            whole_price = price * (1 - self.discount / 100.)
+        except TypeError:
+            price, whole_price = None, None
+        result.update({
+            'price': price,
+            'whole_price': whole_price,
+            'discount': self.discount
+        })
+        return result
+
+    def get_start_date(self):
+        c = self.courses.first()
+        if c.next_session:
+            return c.next_session.datetime_starts
+
+
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
     module = models.ForeignKey(EducationalModule, verbose_name=_(u'Образовательный модуль'))
@@ -150,3 +278,4 @@ class EducationalModuleEnrollmentReason(models.Model):
 edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
 edmodule_unenrolled.connect(edmodule_unenrolled_handler, sender=EducationalModuleEnrollment)
 edmodule_payed.connect(edmodule_payed_handler, sender=EducationalModuleEnrollmentReason)
+course_rating_updated_or_created.connect(update_mean_ratings)

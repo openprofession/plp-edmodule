@@ -6,7 +6,7 @@ from .models import EducationalModule, EducationalModuleEnrollment
 
 
 class EducationalModuleAdmin(admin.ModelAdmin):
-    filter_horizontal = ('courses', )
+    pass
 
 
 class EducationalModuleEnrollmentAdmin(admin.ModelAdmin):

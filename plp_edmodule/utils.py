@@ -3,11 +3,12 @@
 import logging
 import requests
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from raven import Client
 from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunicationError, EDXEnrollmentError
 from plp.models import CourseSession
-from .models import EducationalModuleProgress
+from .models import EducationalModuleProgress, EducationalModuleRating
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
 client = None
@@ -111,3 +112,12 @@ def update_module_enrollment_progress(enrollment):
             EducationalModuleProgress.objects.create(enrollment=enrollment, progress=data)
     except EDXEnrollmentError:
         pass
+
+
+def get_feedback_list(module):
+    filter_dict = {
+        'content_type': ContentType.objects.get_for_model(module),
+        'object_id': module.id,
+    }
+    rating_list = EducationalModuleRating.objects.filter(**filter_dict).order_by('-updated_at')[:2]
+    return rating_list
