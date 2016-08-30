@@ -9,8 +9,7 @@ from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from sortedm2m.fields import SortedManyToManyField
 from plp.models import Course, User, SessionEnrollmentType, Participant
-from plp_extension.apps.course_review.models import AbstractRating
-from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
+from plp_extension.apps.review.models import AbstractRating
 from plp_extension.apps.module_extension.models import DEFAULT_COVER_SIZE
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_payed, edmodule_payed_handler, \
@@ -358,4 +357,3 @@ class EducationalModuleEnrollmentReason(models.Model):
 edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
 edmodule_unenrolled.connect(edmodule_unenrolled_handler, sender=EducationalModuleEnrollment)
 edmodule_payed.connect(edmodule_payed_handler, sender=EducationalModuleEnrollmentReason)
-course_rating_updated_or_created.connect(update_mean_ratings)
