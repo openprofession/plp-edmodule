@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-08-23 13:20+0300\n"
+"POT-Creation-Date: 2016-08-29 18:21+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -47,6 +47,12 @@ msgid "Стоимость"
 msgstr ""
 
 msgid "Скидка"
+msgstr ""
+
+msgid "Сумма оценок"
+msgstr ""
+
+msgid "Количество оценок"
 msgstr ""
 
 msgid "Образовательный модуль"
@@ -137,6 +143,76 @@ msgid "Причина записи"
 msgstr ""
 
 msgid "Причины записи"
+msgstr ""
+
+msgid "О курсе"
+msgstr ""
+
+msgid "Авторы:"
+msgstr ""
+
+msgid "Бизнес-партнеры:"
+msgstr ""
+
+msgid "Лекторы"
+msgstr ""
+
+msgid "портрет преподавателя"
+msgstr ""
+
+msgid "Должность:"
+msgstr ""
+
+msgid "Что я получу в итоге?"
+msgstr ""
+
+msgid "Записаться"
+msgstr ""
+
+msgid "Список тем"
+msgstr ""
+
+msgid "Стоимость получения сертификата"
+msgstr ""
+
+#, python-format
+msgid "Все курсы (%(num)s)"
+msgstr ""
+
+#, python-format
+msgid "Экономия %(percent)s%%"
+msgstr ""
+
+msgid "Рейтинг"
+msgstr ""
+
+#, python-format
+msgid "%(rating)s из 5"
+msgstr ""
+
+#, python-format
+msgid "%(counter)s отзыв"
+msgid_plural "%(counter)s отзывов"
+msgstr[0] "%(counter)s отзыв"
+msgstr[1] "%(counter)s отзыва"
+msgstr[2] "%(counter)s отзывов"
+
+msgid "Похожие курсы и специализации"
+msgstr ""
+
+msgid "Специализация"
+msgstr ""
+
+msgid "О специализации"
+msgstr ""
+
+msgid "Расписание"
+msgstr ""
+
+msgid "Отзывы"
+msgstr ""
+
+msgid "Поделиться"
 msgstr ""
 
 #, python-format

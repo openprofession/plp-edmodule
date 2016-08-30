@@ -1,13 +1,15 @@
 # coding: utf-8
 
+import random
 import logging
 from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
 from plp.models import HonorCode, CourseSession, Course
+from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
-from .utils import update_module_enrollment_progress, client
+from .utils import update_module_enrollment_progress, client, get_feedback_list
 from .signals import edmodule_enrolled
 
 
@@ -82,9 +84,27 @@ def module_page(request, code):
     module = get_object_or_404(EducationalModule, code=code)
     if module.status == HIDDEN and not request.user.is_staff:
         raise Http404
+    authors = module.get_authors()
+    partners = module.get_partners()
+    # TODO: catalog_link
+    # catalog_link = reverse('modules_catalog') + '?' + '&'.join(['cat=%s' % i.code for i in module.categories])
+    catalog_link = ''
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
         'courses': module.courses.all(),
+        'authors': u', '.join([i.title for i in authors]),
+        'partners': u', '.join([i.title for i in partners]),
+        'authors_and_partners': authors + partners,
+        'profits': module.get_module_profit(),
+        'related': module.get_related(),
+        'price_data': module.get_price_list(),
+        'schedule': module.get_schedule(),
+        'rating': module.get_rating(),
+        'count_ratings': module.count_ratings,
+        'catalog_link': catalog_link,
+        'start_date': module.get_start_date(),
+        'feedback_list': get_feedback_list(module),
+        'instructors': module.instructors,
         'authenticated': request.user.is_authenticated(),
     })
 
@@ -104,12 +124,44 @@ def get_honor_text(request):
     return JsonResponse({'honor_text': honor_text})
 
 
-def update_context_with_modules(context, user):
-    if user.is_authenticated():
-        modules = EducationalModule.objects.filter(educationalmoduleenrollment__user=user).distinct().order_by('title')
-    else:
-        modules = EducationalModule.objects.none()
+def update_course_details_context(context, user):
+    modules = EducationalModule.objects.filter(courses=context['object']).distinct()
     context['modules'] = modules
+    try:
+        course_extended = context['object'].extended_params
+        authors = list(course_extended.authors.all())
+        partners = list(course_extended.partners.all())
+        profits = course_extended.profit or ''
+        categories = course_extended.categories.all()
+        related = []
+        if categories:
+            modules = EducationalModule.objects.filter(
+                courses__extended_params__categories__in=categories).distinct()
+            courses = Course.objects.exclude(id=context['object'].id).filter(
+                extended_params__categories__in=categories).distinct()
+            if modules:
+                related = [
+                    {'type': 'em', 'item': random.sample(modules, 1)[0]},
+                ]
+            if courses:
+                if len(courses) > 1 and len(related):
+                    sample = random.sample(courses, 2)
+                    related = [
+                        {'type': 'course', 'item': sample[0]},
+                        {'type': 'course', 'item': sample[1]}
+                    ]
+                else:
+                    related.append({'type': 'course', 'item': courses[0]})
+        context.update({
+            'authors': u', '.join([i.title for i in authors]),
+            'partners': u', '.join([i.title for i in partners]),
+            'authors_and_partners': authors + partners,
+            'profits': [i.strip() for i in profits.splitlines() if i.strip()],
+            'schedule': course_extended.themes,
+            'related': related,
+        })
+    except CourseExtendedParameters.DoesNotExist:
+        pass
 
 
 @require_GET

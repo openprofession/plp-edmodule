@@ -7,4 +7,5 @@ setup(
     description='PLP edmodule',
     url='http://example.com',
     author='author',
+    install_requires=['django-sortedm2m==1.3.2']
 )

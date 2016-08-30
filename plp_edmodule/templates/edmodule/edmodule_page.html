@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% load imagekit %}
+{% load staticfiles %}
+{% load html_helpers %}
+{% load i18n %}
+
+{% block title %}{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="row">
+            <div class="cource-video">
+                {% if object.cover and object.cover|file_exists %}
+                  {% generateimage 'imagekit:thumbnail' source=object.cover width=297 height=166 as img %}<img src="{{ img.url }}" />
+                {% else %}
+                  <img src="{% static 'img/course-image2.jpg' %}" alt="" class="course-image">
+                {% endif %}
+            </div>
+            <h1>{{ object.title }}</h1>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="row">
+                    <p>
+                        <span>{% blocktrans %}О курсе{% endblocktrans %}</span>
+                        {{ object.about|safe }}
+                    </p>
+                </div>
+                <div class="row">
+                    {# партнеры #}
+                    <p>
+                        {% for item in authors_and_partners %}
+                            {% if item.image and item.image|file_exists %}
+                                <img src="{{ item.image.url }}">
+                            {% endif %}
+                        {% endfor %}
+                    </p>
+                    {% if authors %}
+                        <p>
+                            <span>{% blocktrans %}Авторы:{% endblocktrans %}</span>{{ authors }}
+                        </p>
+                    {% endif %}
+                    {% if partners %}
+                        <p>
+                            <span>{% blocktrans %}Бизнес-партнеры:{% endblocktrans %}</span>{{ partners }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div class="row">
+                    <h3>{% blocktrans %}Лекторы{% endblocktrans %}</h3>
+                    {% for teacher in instructors %}
+                        <div>
+                            {% if teacher.photo and teacher.photo|file_exists %}
+                              {% generateimage 'imagekit:thumbnail' source=teacher.photo width=133 height=133 as img %}<img src="{{ img.url }}" alt="{{ teacher.photo_alt }}" class="picture img-circle" />
+                            {% else %}
+                              <img src="{% static 'img/user-default.png' %}" height="133" width="133" alt="{% blocktrans %}портрет преподавателя{% endblocktrans %}" class="picture img-circle">
+                            {% endif %}
+                        <div class="card-body">
+                          <h3>{{ teacher.name }}</h3>
+                          <p class="instructor-post">
+                            {{ teacher.academic_degree|capfirst }}{% if teacher.academic_status %}{% if teacher.academic_degree%}, {% endif %}{{ teacher.academic_status }}{% endif %}
+                            {% if teacher.post %}
+                              <br><span class="comment">{% blocktrans %}Должность:{% endblocktrans %}</span> {{ teacher.post }}
+                            {% endif %}
+                          </p>
+                        </div>
+                      </div>
+                    {% endfor %}
+                </div>
+
+                {% if profits %}
+                <div class="row">
+                    <h3>{% blocktrans %}Что я получу в итоге?{% endblocktrans %}</h3>
+                    {% for i in profits %}
+                        <div class="col-md-6">{{ i }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="row">
+                    {# url для записи, в post запросе ожидается ed_module_code = object.code is_active = true #}
+                    <!-- {% url 'edmodule-enroll' %} -->
+                    <button class="btn btn-primary">{% blocktrans %}Записаться{% endblocktrans %}</button>
+                </div>
+
+                <div class="row">
+                    {# Вакансии #}
+                </div>
+
+                {% if courses %}
+                <div class="row">
+                    <h3>{% blocktrans %}Список тем{% endblocktrans %}</h3>
+                    {{ schedule.0.course.title }}
+                    {{ schedule.0.schedule|safe }}
+                </div>
+                {% endif %}
+
+                <div class="row">
+                    <h3>{% blocktrans %}Стоимость получения сертификата{% endblocktrans %}</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            {% blocktrans with num=courses|length %}Все курсы ({{ num }}){% endblocktrans %}
+                        </div>
+                        {% if price_data.discount %}
+                            <div class="col-md-3 col-md-push-6">
+                                <s>{{ price_data.price }}</s>
+                            </div>
+                            <div class="col-md-3 col-md-push-9">
+                                <span>{{ price_data.whole_price }}</span>
+                                <br>
+                                <span class="small">{% blocktrans with percent=price_data.discount %}Экономия {{ percent }}%{% endblocktrans %}</span>
+                            </div>
+                        {% else %}
+                            <div class="col-md-6 col-md-push-6">
+                                {{ price_data.price }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="row">
+                        <ol>
+                            {% for course, price in price_data.courses %}
+                                <li>{{ course.title }} {{ price }}</li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <h3>{% blocktrans %}Рейтинг{% endblocktrans %}</h3>
+                    {% blocktrans %}{{ rating }} из 5{% endblocktrans %}
+                    (
+                    {% blocktrans trimmed count counter=count_ratings %}
+                    {{ counter }} отзыв
+                    {% plural %}
+                    {{ counter }} отзывов
+                    {% endblocktrans %}
+                    )
+                </div>
+
+                {% if related %}
+                <div class="row">
+                    <h3>{% blocktrans %}Похожие курсы и специализации{% endblocktrans %}</h3>
+                    {% for item in related %}
+                        {# TODO: templates для карточки курса (из b_courses.html) и модуля #}
+                        {% if item.type == 'course' %}
+                            <div>{% with course=item.item %}{% endwith %}</div>
+                        {% else %}
+                            <div>{% with module=item.item %}{% endwith %}</div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-md-4">
+                <div class="row">
+                    {# оценки пользователей #}
+                </div>
+                <div class="row">
+                    {% blocktrans %}Специализация{% endblocktrans %}
+                    <br>
+                    {{ object.title }}
+                    <br>
+                    <button class="btn btn-primary">{% blocktrans %}Записаться{% endblocktrans %}</button>
+                </div>
+                <div class="row">
+                    <a href="#">{% blocktrans %}О специализации{% endblocktrans %}</a>
+                    <hr>
+                    <a href="#">{% blocktrans %}Расписание{% endblocktrans %}</a>
+                    <hr>
+                    <a href="#">{% blocktrans %}Отзывы{% endblocktrans %}</a>
+                    <hr>
+                    <a href="#">{% blocktrans %}Поделиться{% endblocktrans %}</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
