@@ -124,6 +124,14 @@ def get_honor_text(request):
     return JsonResponse({'honor_text': honor_text})
 
 
+def update_context_with_modules(context, user):
+    if user.is_authenticated():
+        modules = EducationalModule.objects.filter(educationalmoduleenrollment__user=user).distinct().order_by('title')
+    else:
+        modules = EducationalModule.objects.none()
+    context['modules'] = modules
+
+
 def update_course_details_context(context, user):
     modules = EducationalModule.objects.filter(courses=context['object']).distinct()
     context['modules'] = modules
