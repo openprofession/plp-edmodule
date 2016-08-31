@@ -5,9 +5,11 @@ import requests
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
+from django.utils.translation import ugettext as _
 from raven import Client
 from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunicationError, EDXEnrollmentError
 from plp.models import CourseSession
+from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from .models import EducationalModuleProgress, EducationalModuleRating
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
@@ -118,6 +120,85 @@ def get_feedback_list(module):
     filter_dict = {
         'content_type': ContentType.objects.get_for_model(module),
         'object_id': module.id,
+        'status': 'published',
+        'declined': False,
     }
     rating_list = EducationalModuleRating.objects.filter(**filter_dict).order_by('-updated_at')[:2]
     return rating_list
+
+
+def get_status_dict(session):
+    months = {
+        1: _(u'января'),
+        2: _(u'февраля'),
+        3: _(u'марта'),
+        4: _(u'апреля'),
+        5: _(u'мая'),
+        6: _(u'июня'),
+        7: _(u'июля'),
+        8: _(u'августа'),
+        9: _(u'сенятбря'),
+        10: _(u'октября'),
+        11: _(u'ноября'),
+        12: _(u'декабря'),
+    }
+    if session:
+        status = session.course_status()
+        d = {'status': status['code']}
+        if status['code'] == 'scheduled':
+            starts = timezone.localtime(session.datetime_starts).date()
+            d['days_before_start'] = (starts - timezone.now().date()).days
+            d['date'] = session.datetime_starts.strftime('%d.%m.%Y')
+            day, month = starts.day, months.get(starts.month)
+            d['date_words'] = _(u'начало {day} {month}').format(day=day, month=month)
+        elif status['code'] == 'started':
+            ends = timezone.localtime(session.datetime_end_enroll)
+            d['date'] = ends.strftime('%d.%m.%Y')
+            day, month = ends.day, months.get(ends.month)
+            d['date_words'] = _(u'запись до {day} {month}').format(day=day, month=month)
+        return d
+    else:
+        return {'status': ''}
+
+
+def choose_closest_session(c):
+    sessions = c.course_sessions.all()
+    if sessions:
+        sessions = filter(lambda x: x.datetime_end_enroll and x.datetime_end_enroll > timezone.now()
+                                and x.datetime_starts, sessions)
+        sessions = sorted(sessions, key=lambda x: x.datetime_end_enroll)
+        if sessions:
+            return sessions[0]
+    return None
+
+
+def course_set_attrs(instance):
+    """
+    копируем атрибуты связанного CourseExtendedParams, добавляем методы
+    """
+    def _get_next_session(self):
+        return choose_closest_session(self)
+
+    def _get_course_status_params(self):
+        return get_status_dict(self.get_next_session())
+
+    new_methods = {
+        'get_next_session': _get_next_session,
+        'course_status_params': _get_course_status_params,
+    }
+
+    for name, method in new_methods.iteritems():
+        setattr(instance, name, method)
+
+    try:
+        ext = instance.extended_params
+    except CourseExtendedParameters.DoesNotExist:
+        ext = None
+    for field in CourseExtendedParameters._meta.fields:
+        if not field.auto_created and field.editable:
+            if ext:
+                setattr(instance, field.name, getattr(ext, field.name))
+            else:
+                setattr(instance, field.name, None)
+
+    return instance

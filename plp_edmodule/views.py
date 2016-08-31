@@ -1,15 +1,20 @@
 # coding: utf-8
 
+import os
+import json
 import random
 import logging
+from django.db.models import Count
+from django.core.files.storage import default_storage
 from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 from plp.models import HonorCode, CourseSession, Course
-from plp_extension.apps.course_extension.models import CourseExtendedParameters
+from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
-from .utils import update_module_enrollment_progress, client, get_feedback_list
+from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs
 from .signals import edmodule_enrolled
 
 
@@ -91,7 +96,7 @@ def module_page(request, code):
     catalog_link = ''
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
-        'courses': module.courses.all(),
+        'courses': [course_set_attrs(i) for i in module.courses.all()],
         'authors': u', '.join([i.title for i in authors]),
         'partners': u', '.join([i.title for i in partners]),
         'authors_and_partners': authors + partners,
@@ -125,6 +130,19 @@ def get_honor_text(request):
 
 
 def update_course_details_context(context, user):
+    """
+    в контекст страницы курса добавляются параметры:
+    modules: специализации, в которые входит курс
+    authors: строка, создатели курса
+    partners: строка, партнеры курса курса
+    authors_and_partners: массив объектов CourseCreator, у каждого есть поле image
+    profits: массив строк "Результаты обучения"
+    schedule: json вида [{"col1": "Неделя 1", "col2": "Текст"}, ...]
+    related: массив <= 2 элементов вида {'type': 'em', 'item': item}, где
+        type - 'em' или 'course', item обект специализации или курса
+
+    также через object можно получать атрибуты связанного CourseExtendedParameters
+    """
     modules = EducationalModule.objects.filter(courses=context['object']).distinct()
     context['modules'] = modules
     try:
@@ -152,7 +170,9 @@ def update_course_details_context(context, user):
                     ]
                 else:
                     related.append({'type': 'course', 'item': courses[0]})
+        obj = course_set_attrs(context['object'])
         context.update({
+            'object': obj,
             'authors': u', '.join([i.title for i in authors]),
             'partners': u', '.join([i.title for i in partners]),
             'authors_and_partners': authors + partners,
@@ -189,3 +209,125 @@ def edmodule_filter_view(request):
         'modules': [i.code for i in modules]
     }
     return JsonResponse(result)
+
+
+def edmodule_catalog_view(request, category=None):
+    """
+    Передаваемый контекст:
+    chosen_category: None или slug выбранной категории
+    categories: все существующие объекты Category
+    courses: словарь, ключ - id курса, значение: {
+        'title': строка,
+        'authors': массив строк,
+        'course_status_params': {
+            'status': строка 'scheduled', 'started' или '',
+            'date': опционально если status != '', дата окончания записи если status == 'started',
+                дата начала курса если status == 'scheduled', строка вида дд.мм.гггг,
+            'days_before_start': опционально если status == 'scheduled' число дней до начала курса
+        }
+    }
+    modules: аналогично courses, значение: {
+        'title',
+        'authors',
+        'course_status_params',
+        'count_courses': число курсов в модуле
+    }
+    course_covers: словарь, ключ - id курса, значение - объект картинки курса
+    module_covers: аналогично course_covers
+    """
+    def _choose_closest_session(c):
+        sessions = c.course_sessions.all()
+        if sessions:
+            sessions = filter(lambda x: x.datetime_end_enroll and x.datetime_end_enroll > timezone.now()
+                                    and x.datetime_starts, sessions)
+            sessions = sorted(sessions, key=lambda x: x.datetime_end_enroll)
+            if sessions:
+                return sessions[0]
+        return None
+
+    def _get_status_dict(session):
+        if session:
+            status = session.course_status()
+            d = {'status': status['code']}
+            if status['code'] == 'scheduled':
+                d['days_before_start'] = (session.datetime_starts.date() - timezone.now().date()).days
+                d['date'] = session.datetime_starts.strftime('%d.%m.%Y')
+            elif status['code'] == 'started':
+                d['date'] = session.datetime_end_enroll.strftime('%d.%m.%Y')
+            return d
+        else:
+            return {'status': ''}
+
+    courses, modules, course_covers, module_covers = {}, {}, {}, {}
+    cover_path = Course._meta.get_field('cover').upload_to
+    try:
+        all_course_covers = default_storage.listdir(cover_path)[1]
+    except OSError:
+        all_course_covers = None
+    cover_path = EducationalModule._meta.get_field('cover').upload_to
+    try:
+        all_module_covers = default_storage.listdir(cover_path)[1]
+    except OSError:
+        all_module_covers = None
+
+    if not category:
+        courses_query = Course.objects.filter(status='published').prefetch_related(
+            'extended_params', 'extended_params__authors', 'course_sessions').distinct()
+    else:
+        courses_query = Course.objects.filter(status='published', extended_params__categories__slug=category).\
+            prefetch_related('extended_params', 'extended_params__authors', 'course_sessions').distinct()
+    for c in courses_query:
+        if c.cover:
+            cover_name = os.path.split(c.cover.name)[-1]
+            if cover_name in all_course_covers:
+                course_covers[c.pk] = c.cover
+            else:
+                if client:
+                    client.captureMessage('Image not found: %s' % str(c.cover))
+        try:
+            extended = c.extended_params
+            authors = [i.title for i in extended.authors.all()]
+        except CourseExtendedParameters.DoesNotExist:
+            authors = []
+        dic = {
+            'title': c.title,
+            'authors': authors,
+            'status': '',
+        }
+        session = _choose_closest_session(c)
+        dic.update(_get_status_dict(session))
+        courses[c.id] = dic
+
+    for m in EducationalModule.objects.filter(status='published', courses__id__in=courses.keys()).\
+            annotate(cnt_courses=Count('courses')):
+        if m.cover:
+            cover_name = os.path.split(m.cover.name)[-1]
+            if cover_name in all_module_covers:
+                module_covers[m.pk] = m.cover
+            else:
+                if client:
+                    client.captureMessage('Image not found: %s' % str(m.cover))
+
+        dic = {
+            'title': m.title,
+            'authors': [i.title for i in m.get_authors()],
+            'count_courses': m.cnt_courses,
+        }
+        first_course = m.courses.first()
+        if first_course:
+            if first_course.id in courses:
+                for key in ['status', 'days_before_start', 'date']:
+                    if key in courses[first_course.id]:
+                        dic[key] = courses[first_course.id][key]
+            else:
+                dic.update(_get_status_dict(_choose_closest_session(first_course)))
+
+    context = {
+        'chosen_category': category,
+        'categories': Category.objects.all(),
+        'courses': json.dumps(courses, ensure_ascii=False),
+        'modules': json.dumps(modules, ensure_ascii=False),
+        'course_covers': course_covers,
+        'module_covers': module_covers,
+    }
+    return render(request, 'edmodule/catalog.html', context)

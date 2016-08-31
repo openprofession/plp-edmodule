@@ -184,6 +184,17 @@ class EducationalModule(models.Model):
         if c.next_session:
             return c.next_session.datetime_starts
 
+    def course_status_params(self):
+        from .utils import get_status_dict, choose_closest_session
+        c = self.courses.first()
+        if c:
+            return get_status_dict(choose_closest_session(c))
+        return {}
+
+    @property
+    def count_courses(self):
+        return self.courses.count()
+
 
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
