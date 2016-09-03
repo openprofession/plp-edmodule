@@ -2,6 +2,7 @@
 
 import logging
 import requests
+import types
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
@@ -212,7 +213,7 @@ def course_set_attrs(instance):
     }
 
     for name, method in new_methods.iteritems():
-        setattr(instance, name, method)
+        setattr(instance, name, types.MethodType(method, instance))
 
     try:
         ext = instance.extended_params
