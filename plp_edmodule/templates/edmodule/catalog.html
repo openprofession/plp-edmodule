@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% load i18n %}
+{% load imagekit %}
+{% load pytils_numeral %}
+{% load pytils_dt %}
+{% load staticfiles %}
+{% load html_helpers %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-md-2">
+            {# блок с категориями #}
+            {% for cat in categories %}
+                <a href="{% url 'edmodule-catalog' category=cat.slug %}">{{ cat.title }}</a>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    {{ block.super }}
+    <script>
+        var COURSE_COVERS = {
+            {% for pk, c in course_covers.items %}{% generateimage 'imagekit:thumbnail' source=c width=275 height=155 as img %}'{{ pk }}':'{{ img.url }}'{% if not forloop.last %},{% endif %}{% endfor %}
+        };
+        var MODULE_COVERS = {
+            {% for pk, c in module_covers.items %}{% generateimage 'imagekit:thumbnail' source=c width=275 height=155 as img %}'{{ pk }}':'{{ img.url }}'{% if not forloop.last %},{% endif %}{% endfor %}
+        };
+        var COURSES = {{ courses|safe }};
+        var MODULES = {{ modules|safe }};
+    </script>
+{% endblock %}
