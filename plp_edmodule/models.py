@@ -195,6 +195,15 @@ class EducationalModule(models.Model):
     def count_courses(self):
         return self.courses.count()
 
+    def may_enroll(self):
+        from .utils import choose_closest_session
+        first_course = self.courses.first()
+        if first_course:
+            session = choose_closest_session(first_course)
+            if session:
+                return session.allow_enrollments()
+        return False
+
 
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))

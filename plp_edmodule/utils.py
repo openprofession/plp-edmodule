@@ -156,6 +156,8 @@ def get_status_dict(session):
             d['date'] = ends.strftime('%d.%m.%Y')
             day, month = ends.day, months.get(ends.month)
             d['date_words'] = _(u'запись до {day} {month}').format(day=day, month=month)
+        if session.datetime_end_enroll:
+            d['days_to_enroll'] = (session.datetime_end_enroll.date() - timezone.now().date()).days
         return d
     else:
         return {'status': ''}
@@ -182,9 +184,31 @@ def course_set_attrs(instance):
     def _get_course_status_params(self):
         return get_status_dict(self.get_next_session())
 
+    def _get_requirements(self):
+        return _string_splitter(self, 'requirements')
+
+    def _get_profit(self):
+        return _string_splitter(self, 'profit')
+
+    def _get_documents(self):
+        return _string_splitter(self, 'documents')
+
+    def _string_splitter(obj, attr):
+        try:
+            ext = getattr(obj, 'extended_params')
+            s = getattr(ext, attr)
+            if s:
+                return [i.strip() for i in s.splitlines() if i.strip()]
+            return []
+        except CourseExtendedParameters.DoesNotExist:
+            return []
+
     new_methods = {
         'get_next_session': _get_next_session,
         'course_status_params': _get_course_status_params,
+        'get_requirements': _get_requirements,
+        'get_profit': _get_profit,
+        'get_documents': _get_documents,
     }
 
     for name, method in new_methods.iteritems():

@@ -14,7 +14,7 @@ from django.utils import timezone
 from plp.models import HonorCode, CourseSession, Course
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
-from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs
+from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict
 from .signals import edmodule_enrolled
 
 
@@ -184,6 +184,58 @@ def update_course_details_context(context, user):
         pass
 
 
+def update_frontpage_context(context):
+    now = timezone.now()
+    course_ids = CourseSession.objects.filter(
+        course__status=PUBLISHED,
+        datetime_start_enroll__lt=now,
+        datetime_end_enroll__gt=now
+    ).values_list('course__id', flat=True).distinct()
+    by_category, by_category_dpo = {}, {}
+    for c in Category.objects.all():
+        by_category[c.id] = list(CourseExtendedParameters.objects.filter(
+            categories=c, is_dpo=False, course__id__in=course_ids).values_list('course__id', flat=True))
+        by_category_dpo[c.id] = list(CourseExtendedParameters.objects.filter(
+            categories=c, is_dpo=True, course__id__in=course_ids).values_list('course__id', flat=True))
+
+    objects = []
+    for c, ids in by_category.iteritems():
+        modules = EducationalModule.objects.filter(
+            status=PUBLISHED,
+            courses__id__in=ids,
+        ).prefetch_related('courses')
+        for m in modules:
+            if m.may_enroll():
+                objects.append({'type': 'em', 'item': m})
+                continue
+        courses = Course.objects.filter(id__in=ids)
+        if courses:
+            objects.append({'type': 'course', 'item': course_set_attrs(courses[0])})
+        if len(objects) > 5:
+            break
+
+    objects_dpo = []
+    for c, ids in by_category_dpo.iteritems():
+        modules = EducationalModule.objects.filter(
+            status=PUBLISHED,
+            courses__in=ids,
+        ).prefetch_related('courses')
+        for m in modules:
+            if m.may_enroll():
+                objects_dpo.append({'type': 'em', 'item': m})
+                continue
+        courses = Course.objects.filter(id__in=ids)
+        if courses:
+            objects_dpo.append({'type': 'course', 'item': course_set_attrs(courses[0])})
+        if len(objects_dpo) > 5:
+            break
+
+    context.update({
+        'objects': objects,
+        'objects_dpo': objects_dpo,
+    })
+
+
 @require_GET
 def edmodule_filter_view(request):
     """
@@ -245,19 +297,6 @@ def edmodule_catalog_view(request, category=None):
                 return sessions[0]
         return None
 
-    def _get_status_dict(session):
-        if session:
-            status = session.course_status()
-            d = {'status': status['code']}
-            if status['code'] == 'scheduled':
-                d['days_before_start'] = (session.datetime_starts.date() - timezone.now().date()).days
-                d['date'] = session.datetime_starts.strftime('%d.%m.%Y')
-            elif status['code'] == 'started':
-                d['date'] = session.datetime_end_enroll.strftime('%d.%m.%Y')
-            return d
-        else:
-            return {'status': ''}
-
     courses, modules, course_covers, module_covers = {}, {}, {}, {}
     cover_path = Course._meta.get_field('cover').upload_to
     try:
@@ -270,12 +309,14 @@ def edmodule_catalog_view(request, category=None):
     except OSError:
         all_module_covers = None
 
-    if not category:
-        courses_query = Course.objects.filter(status='published').prefetch_related(
-            'extended_params', 'extended_params__authors', 'course_sessions').distinct()
-    else:
-        courses_query = Course.objects.filter(status='published', extended_params__categories__slug=category).\
-            prefetch_related('extended_params', 'extended_params__authors', 'course_sessions').distinct()
+    courses_query = Course.objects.filter(status='published').prefetch_related(
+        'extended_params', 'extended_params__authors', 'course_sessions').distinct()
+    # if not category:
+    #     courses_query = Course.objects.filter(status='published').prefetch_related(
+    #         'extended_params', 'extended_params__authors', 'course_sessions').distinct()
+    # else:
+    #     courses_query = Course.objects.filter(status='published', extended_params__categories__slug=category).\
+    #         prefetch_related('extended_params', 'extended_params__authors', 'course_sessions').distinct()
     for c in courses_query:
         if c.cover:
             cover_name = os.path.split(c.cover.name)[-1]
@@ -292,10 +333,10 @@ def edmodule_catalog_view(request, category=None):
         dic = {
             'title': c.title,
             'authors': authors,
-            'status': '',
+            'course_status_params': '',
         }
         session = _choose_closest_session(c)
-        dic.update(_get_status_dict(session))
+        dic.update({'course_status_params': get_status_dict(session)})
         courses[c.id] = dic
 
     for m in EducationalModule.objects.filter(status='published', courses__id__in=courses.keys()).\
@@ -313,14 +354,7 @@ def edmodule_catalog_view(request, category=None):
             'authors': [i.title for i in m.get_authors()],
             'count_courses': m.cnt_courses,
         }
-        first_course = m.courses.first()
-        if first_course:
-            if first_course.id in courses:
-                for key in ['status', 'days_before_start', 'date']:
-                    if key in courses[first_course.id]:
-                        dic[key] = courses[first_course.id][key]
-            else:
-                dic.update(_get_status_dict(_choose_closest_session(first_course)))
+        dic.update({'course_status_params': m.course_status_params})
 
     context = {
         'chosen_category': category,

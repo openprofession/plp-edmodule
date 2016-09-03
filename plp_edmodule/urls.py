@@ -10,5 +10,5 @@ urlpatterns = [
     url(r'^get-honor-text/?$', views.get_honor_text, name='get-honor-text'),
     url(r'^course/filter/?$', views.edmodule_filter_view, name='edmodule-filter'),
     url(r'^catalog/?$', views.edmodule_catalog_view, name='edmodule-catalog'),
-    url(r'^catalog/(?P<category>[-\w]+)/?$', views.edmodule_catalog_view, name='edmodule-catalog'),
+    # url(r'^catalog/(?P<category>[-\w]+)/?$', views.edmodule_catalog_view, name='edmodule-catalog'),
 ]
