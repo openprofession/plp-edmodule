@@ -3,6 +3,7 @@
 import random
 from django.core import validators
 from django.db import models
+from django.utils.functional import cached_property
 from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from sortedm2m.fields import SortedManyToManyField
@@ -136,7 +137,7 @@ class EducationalModule(models.Model):
         """
         return [i.next_session for i in self.courses.all()]
 
-    @property
+    @cached_property
     def courses_extended(self):
         return CourseExtendedParameters.objects.filter(course__id__in=self.courses.values_list('id', flat=True))
 
@@ -185,24 +186,32 @@ class EducationalModule(models.Model):
             return c.next_session.datetime_starts
 
     def course_status_params(self):
-        from .utils import get_status_dict, choose_closest_session
-        c = self.courses.first()
+        from .utils import get_status_dict
+        c = self.get_closest_course_with_session()
         if c:
-            return get_status_dict(choose_closest_session(c))
+            return get_status_dict(c[1])
         return {}
 
     @property
     def count_courses(self):
         return self.courses.count()
 
-    def may_enroll(self):
+    @cached_property
+    def courses_with_closest_sessions(self):
         from .utils import choose_closest_session
-        first_course = self.courses.first()
-        if first_course:
-            session = choose_closest_session(first_course)
-            if session:
-                return session.allow_enrollments()
-        return False
+        courses = self.courses.exclude(extended_params__is_project=True)
+        return [(c, choose_closest_session(c)) for c in courses]
+
+    def get_closest_course_with_session(self):
+        courses = self.courses_with_closest_sessions
+        courses = filter(lambda x: x[1] and x[1].datetime_starts, courses)
+        courses = sorted(courses, key=lambda x: x[1].datetime_starts)
+        if courses:
+            return courses[0]
+
+    def may_enroll(self):
+        courses = self.courses_with_closest_sessions
+        return all(i[1] and i[1].allow_enrollments() for i in courses)
 
 
 class EducationalModuleEnrollment(models.Model):
