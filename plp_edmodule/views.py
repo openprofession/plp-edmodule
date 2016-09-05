@@ -4,13 +4,18 @@ import os
 import json
 import random
 import logging
+from django.conf import settings
 from django.db.models import Count
 from django.core.files.storage import default_storage
+from django.core.urlresolvers import reverse
 from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
+from django.utils.html import strip_tags, strip_spaces_between_tags
+from django.utils.text import Truncator
+from django.views.decorators.cache import cache_page
 from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
@@ -273,6 +278,7 @@ def edmodule_filter_view(request):
     return JsonResponse(result)
 
 
+@cache_page(settings.PAGE_CACHE_TIME)
 def edmodule_catalog_view(request, category=None):
     """
     Передаваемый контекст:
@@ -335,16 +341,19 @@ def edmodule_catalog_view(request, category=None):
             else:
                 if client:
                     client.captureMessage('Image not found: %s' % str(c.cover))
-        try:
-            extended = c.extended_params
-            authors = [i.title for i in extended.authors.all()]
-        except CourseExtendedParameters.DoesNotExist:
-            authors = []
         dic = {
             'title': c.title,
-            'authors': authors,
             'course_status_params': '',
+            'url': reverse('course_details', kwargs={'uni_slug': c.university.slug, 'slug': c.slug}),
         }
+        c = course_set_attrs(c)
+        max_length = CourseExtendedParameters._meta.get_field('short_description').max_length
+        default_desc = strip_tags(strip_spaces_between_tags(c.description or ''))
+        dic.update({
+            'authors_and_partners': [{'url': i.link, 'title': i.title} for i in c.get_authors_and_partners()],
+            'catalog_marker': getattr(c, 'catalog_marker', ''),
+            'short_description': getattr(c, 'short_description', '') or Truncator(default_desc).chars(max_length),
+        })
         session = _choose_closest_session(c)
         dic.update({'course_status_params': get_status_dict(session)})
         courses[c.id] = dic

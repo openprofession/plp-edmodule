@@ -205,12 +205,20 @@ def course_set_attrs(instance):
         except CourseExtendedParameters.DoesNotExist:
             return []
 
+    def _get_authors_and_partners(self):
+        try:
+            extended = self.extended_params
+            return list(extended.authors.all()) + list(extended.partners.all())
+        except CourseExtendedParameters.DoesNotExist:
+            return []
+
     new_methods = {
         'get_next_session': _get_next_session,
         'course_status_params': _get_course_status_params,
         'get_requirements': _get_requirements,
         'get_profit': _get_profit,
         'get_documents': _get_documents,
+        'get_authors_and_partners': _get_authors_and_partners,
     }
 
     for name, method in new_methods.iteritems():
