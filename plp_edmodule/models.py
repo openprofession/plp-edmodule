@@ -7,7 +7,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from sortedm2m.fields import SortedManyToManyField
-from plp.models import Course, User, SessionEnrollmentType
+from plp.models import Course, User, SessionEnrollmentType, Participant
 from plp_extension.apps.course_review.models import AbstractRating
 from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
@@ -212,6 +212,20 @@ class EducationalModule(models.Model):
     def may_enroll(self):
         courses = self.courses_with_closest_sessions
         return all(i[1] and i[1].allow_enrollments() for i in courses)
+
+    def may_enroll_on_project(self, user):
+        if not user.is_authenticated():
+            return False
+        if not EducationalModuleEnrollment.objects.filter(user=user, module=self, is_active=True).exists():
+            return False
+        courses = self.courses.filter(extended_params__is_project=False).values_list('id', flat=True)
+        passed = {i: False for i in courses}
+        participants = Participant.objects.filter(session__course__id__in=courses, user=user).values_list(
+            'session__course__id', 'is_graduate')
+        for course_id, is_graduate in participants:
+            if is_graduate:
+                passed[course_id] = True
+        return all(i for i in passed.values())
 
 
 class EducationalModuleEnrollment(models.Model):

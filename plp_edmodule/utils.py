@@ -5,13 +5,14 @@ import requests
 import types
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.urlresolvers import reverse
 from django.utils import timezone
 from django.utils.translation import ugettext as _
 from raven import Client
 from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunicationError, EDXEnrollmentError
 from plp.models import CourseSession
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
-from .models import EducationalModuleProgress, EducationalModuleRating
+from .models import EducationalModuleProgress, EducationalModuleRating, EducationalModule
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
 client = None
@@ -227,3 +228,15 @@ def course_set_attrs(instance):
                 setattr(instance, field.name, None)
 
     return instance
+
+
+def button_status_project(session, user):
+    status = {'code': 'project_button', 'active': False, 'is_authenticated': user.is_authenticated()}
+    containing_module = EducationalModule.objects.filter(courses__id=session.course.id).first()
+    if containing_module:
+        may_enroll = containing_module.may_enroll_on_project(user)
+        text = _(u'Запись на проект в рамках <a href="{link}">модуля</a> доступна при успешном '
+                 u'прохождении всех курсов модуля').format(
+                link=reverse('edmodule-page', kwargs={'code': containing_module.code}))
+        status.update({'text': text, 'active': may_enroll})
+    return status

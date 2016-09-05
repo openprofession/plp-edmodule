@@ -11,7 +11,9 @@ from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
-from plp.models import HonorCode, CourseSession, Course
+from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason
+from plp.utils.edx_enrollment import EDXEnrollmentError
+from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
 from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict
@@ -373,3 +375,54 @@ def edmodule_catalog_view(request, category=None):
         'module_covers': module_covers,
     }
     return render(request, 'edmodule/catalog.html', context)
+
+
+def enroll_on_course(session, request):
+    def _add_verified_entry(participant, verified_type):
+        try:
+            EnrollmentReason.objects.create(
+                participant=participant,
+                session_enrollment_type=verified_type,
+                payment_type=EnrollmentReason.PAYMENT_TYPE.OTHER,
+                payment_descriptions='module',
+            )
+            return JsonResponse({'status': 1})
+        except EDXEnrollmentError:
+            return JsonResponse({'status': 0, 'error': 'edx error'})
+
+    enrs = EducationalModuleEnrollment.objects.filter(user=request.user, module__courses=session.course)
+    verified = False
+    # в предложении что тип записи на модуль всегда verified
+    if enrs:
+        verified = True
+    participant = Participant.objects.filter(session=session, user=request.user).first()
+    # проверяем что можно записаться
+    if not verified and not session.allow_enrollments():
+        return JsonResponse({'status': 0})
+    elif verified and not participant and not session.allow_enrollments():
+        return JsonResponse({'status': 0})
+
+    verified_type = session.get_verified_mode_enrollment_type()
+    if verified and not verified_type:
+        # если у сессии нет платного варианта прохождения
+        verified = False
+
+    if participant and verified:
+        # если пользователь был записан на курс, стараемся добавить ему verified mode
+        enr_reason = EnrollmentReason.objects.filter(participant=participant, session_enrollment_type=verified_type)
+        if enr_reason:
+            return JsonResponse({'status': 0, 'error': 'already enrolled in verified mode'})
+        return _add_verified_entry(participant, verified_type)
+    elif participant:
+        return JsonResponse({'status': 0, 'error': 'already enrolled'})
+    else:
+        # если записи на курс не было
+        try:
+            _enroll(request=request, user=request.user, session=session)
+            if verified:
+                # если надо записать в verified mode
+                participant = Participant.objects.get(session=session, user=request.user)
+                return _add_verified_entry(participant, verified_type)
+            return JsonResponse({'status': 1})
+        except EDXEnrollmentError:
+            return JsonResponse({'status': 0, 'error': 'edx error'})
