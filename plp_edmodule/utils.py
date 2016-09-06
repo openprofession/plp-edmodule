@@ -5,13 +5,14 @@ import requests
 import types
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.urlresolvers import reverse
 from django.utils import timezone
 from django.utils.translation import ugettext as _
 from raven import Client
 from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunicationError, EDXEnrollmentError
 from plp.models import CourseSession
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
-from .models import EducationalModuleProgress, EducationalModuleRating
+from .models import EducationalModuleProgress, EducationalModuleRating, EducationalModule
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
 client = None
@@ -204,12 +205,20 @@ def course_set_attrs(instance):
         except CourseExtendedParameters.DoesNotExist:
             return []
 
+    def _get_authors_and_partners(self):
+        try:
+            extended = self.extended_params
+            return list(extended.authors.all()) + list(extended.partners.all())
+        except CourseExtendedParameters.DoesNotExist:
+            return []
+
     new_methods = {
         'get_next_session': _get_next_session,
         'course_status_params': _get_course_status_params,
         'get_requirements': _get_requirements,
         'get_profit': _get_profit,
         'get_documents': _get_documents,
+        'get_authors_and_partners': _get_authors_and_partners,
     }
 
     for name, method in new_methods.iteritems():
@@ -227,3 +236,15 @@ def course_set_attrs(instance):
                 setattr(instance, field.name, None)
 
     return instance
+
+
+def button_status_project(session, user):
+    status = {'code': 'project_button', 'active': False, 'is_authenticated': user.is_authenticated()}
+    containing_module = EducationalModule.objects.filter(courses__id=session.course.id).first()
+    if containing_module:
+        may_enroll = containing_module.may_enroll_on_project(user)
+        text = _(u'Запись на проект в рамках <a href="{link}">модуля</a> доступна при успешном '
+                 u'прохождении всех курсов модуля').format(
+                link=reverse('edmodule-page', kwargs={'code': containing_module.code}))
+        status.update({'text': text, 'active': may_enroll})
+    return status

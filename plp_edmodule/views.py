@@ -4,14 +4,21 @@ import os
 import json
 import random
 import logging
+from django.conf import settings
 from django.db.models import Count
 from django.core.files.storage import default_storage
+from django.core.urlresolvers import reverse
 from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
-from plp.models import HonorCode, CourseSession, Course
+from django.utils.html import strip_tags, strip_spaces_between_tags
+from django.utils.text import Truncator
+from django.views.decorators.cache import cache_page
+from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason
+from plp.utils.edx_enrollment import EDXEnrollmentError
+from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
 from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict
@@ -271,6 +278,7 @@ def edmodule_filter_view(request):
     return JsonResponse(result)
 
 
+@cache_page(settings.PAGE_CACHE_TIME)
 def edmodule_catalog_view(request, category=None):
     """
     Передаваемый контекст:
@@ -333,16 +341,19 @@ def edmodule_catalog_view(request, category=None):
             else:
                 if client:
                     client.captureMessage('Image not found: %s' % str(c.cover))
-        try:
-            extended = c.extended_params
-            authors = [i.title for i in extended.authors.all()]
-        except CourseExtendedParameters.DoesNotExist:
-            authors = []
         dic = {
             'title': c.title,
-            'authors': authors,
             'course_status_params': '',
+            'url': reverse('course_details', kwargs={'uni_slug': c.university.slug, 'slug': c.slug}),
         }
+        c = course_set_attrs(c)
+        max_length = CourseExtendedParameters._meta.get_field('short_description').max_length
+        default_desc = strip_tags(strip_spaces_between_tags(c.description or ''))
+        dic.update({
+            'authors_and_partners': [{'url': i.link, 'title': i.title} for i in c.get_authors_and_partners()],
+            'catalog_marker': getattr(c, 'catalog_marker', ''),
+            'short_description': getattr(c, 'short_description', '') or Truncator(default_desc).chars(max_length),
+        })
         session = _choose_closest_session(c)
         dic.update({'course_status_params': get_status_dict(session)})
         courses[c.id] = dic
@@ -373,3 +384,54 @@ def edmodule_catalog_view(request, category=None):
         'module_covers': module_covers,
     }
     return render(request, 'edmodule/catalog.html', context)
+
+
+def enroll_on_course(session, request):
+    def _add_verified_entry(participant, verified_type):
+        try:
+            EnrollmentReason.objects.create(
+                participant=participant,
+                session_enrollment_type=verified_type,
+                payment_type=EnrollmentReason.PAYMENT_TYPE.OTHER,
+                payment_descriptions='module',
+            )
+            return JsonResponse({'status': 1})
+        except EDXEnrollmentError:
+            return JsonResponse({'status': 0, 'error': 'edx error'})
+
+    enrs = EducationalModuleEnrollment.objects.filter(user=request.user, module__courses=session.course)
+    verified = False
+    # в предложении что тип записи на модуль всегда verified
+    if enrs:
+        verified = True
+    participant = Participant.objects.filter(session=session, user=request.user).first()
+    # проверяем что можно записаться
+    if not verified and not session.allow_enrollments():
+        return JsonResponse({'status': 0})
+    elif verified and not participant and not session.allow_enrollments():
+        return JsonResponse({'status': 0})
+
+    verified_type = session.get_verified_mode_enrollment_type()
+    if verified and not verified_type:
+        # если у сессии нет платного варианта прохождения
+        verified = False
+
+    if participant and verified:
+        # если пользователь был записан на курс, стараемся добавить ему verified mode
+        enr_reason = EnrollmentReason.objects.filter(participant=participant, session_enrollment_type=verified_type)
+        if enr_reason:
+            return JsonResponse({'status': 0, 'error': 'already enrolled in verified mode'})
+        return _add_verified_entry(participant, verified_type)
+    elif participant:
+        return JsonResponse({'status': 0, 'error': 'already enrolled'})
+    else:
+        # если записи на курс не было
+        try:
+            _enroll(request=request, user=request.user, session=session)
+            if verified:
+                # если надо записать в verified mode
+                participant = Participant.objects.get(session=session, user=request.user)
+                return _add_verified_entry(participant, verified_type)
+            return JsonResponse({'status': 1})
+        except EDXEnrollmentError:
+            return JsonResponse({'status': 0, 'error': 'edx error'})
