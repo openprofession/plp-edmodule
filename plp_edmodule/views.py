@@ -213,37 +213,49 @@ def update_frontpage_context(context):
         by_category_dpo[c.id] = list(CourseExtendedParameters.objects.filter(
             categories=c, is_dpo=True, course__id__in=course_ids).values_list('course__id', flat=True))
 
-    objects = []
+    objects, objects_ids = [], []
     for c, ids in by_category.iteritems():
+        if len(objects) > 5:
+            break
         modules = EducationalModule.objects.filter(
             status=PUBLISHED,
             courses__id__in=ids,
         ).prefetch_related('courses')
+        added_module = False
         for m in modules:
-            if m.may_enroll():
+            if m.may_enroll() and ('em', m.id) not in objects_ids:
                 objects.append({'type': 'em', 'item': m})
-                continue
-        courses = Course.objects.filter(id__in=ids)
-        if courses:
-            objects.append({'type': 'course', 'item': course_set_attrs(courses[0])})
-        if len(objects) > 5:
-            break
+                objects_ids.append(('em', m.id))
+                added_module = True
+                break
+        if added_module:
+            continue
+        c = Course.objects.filter(id__in=ids).first()
+        if c and ('course', c.id) not in objects_ids:
+            objects.append({'type': 'course', 'item': course_set_attrs(c)})
+            objects_ids.append(('course', c.id))
 
-    objects_dpo = []
+    objects_dpo, objects_dpo_ids = [], []
     for c, ids in by_category_dpo.iteritems():
+        if len(objects_dpo) > 5:
+            break
         modules = EducationalModule.objects.filter(
             status=PUBLISHED,
             courses__in=ids,
         ).prefetch_related('courses')
+        added_module = False
         for m in modules:
-            if m.may_enroll():
+            if m.may_enroll() and ('em', m.id) not in objects_dpo_ids:
                 objects_dpo.append({'type': 'em', 'item': m})
-                continue
-        courses = Course.objects.filter(id__in=ids)
-        if courses:
-            objects_dpo.append({'type': 'course', 'item': course_set_attrs(courses[0])})
-        if len(objects_dpo) > 5:
-            break
+                objects_dpo_ids.append(('em', m.id))
+                added_module = True
+                break
+        if added_module:
+            continue
+        c = Course.objects.filter(id__in=ids).first()
+        if c and ('course', c.id) not in objects_dpo_ids:
+            objects_dpo.append({'type': 'course', 'item': course_set_attrs(c)})
+            objects_dpo_ids.append(('course', c.id))
 
     context.update({
         'objects': objects,
