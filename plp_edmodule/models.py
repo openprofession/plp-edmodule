@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import random
+from django.conf import settings
 from django.core import validators
 from django.db import models
 from django.utils.functional import cached_property
@@ -10,6 +11,7 @@ from sortedm2m.fields import SortedManyToManyField
 from plp.models import Course, User, SessionEnrollmentType, Participant
 from plp_extension.apps.course_review.models import AbstractRating
 from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
+from plp_extension.apps.module_extension.models import DEFAULT_COVER_SIZE
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_payed, edmodule_payed_handler, \
     edmodule_unenrolled, edmodule_unenrolled_handler
@@ -27,7 +29,10 @@ class EducationalModule(models.Model):
     title = models.CharField(verbose_name=_(u'Название'), max_length=200)
     status = models.CharField(_(u'Статус'), max_length=16, choices=STATUSES, default='hidden')
     courses = SortedManyToManyField(Course, verbose_name=_(u'Курсы'), related_name='education_modules')
-    cover = models.ImageField(_(u'Обложка'), upload_to='edmodule_cover', blank=True)
+    cover = models.ImageField(_(u'Обложка EM'), upload_to='edmodule_cover', blank=True,
+        help_text=_(u'Минимум {0}*{1}, картинки большего размера будут сжаты до этого размера').format(
+            *getattr(settings, 'EDMODULE_COVER_IMAGE_SIZE', DEFAULT_COVER_SIZE)
+    ))
     about = models.TextField(verbose_name=_(u'Описание'), blank=False)
     price = models.IntegerField(verbose_name=_(u'Стоимость'), blank=True, null=True)
     discount = models.IntegerField(verbose_name=_(u'Скидка'), blank=True, default=0, validators=[
@@ -44,15 +49,39 @@ class EducationalModule(models.Model):
     def __unicode__(self):
         return u'%s - %s' % (self.code, ', '.join(self.courses.values_list('slug', flat=True)))
 
-    @property
+    @cached_property
     def duration(self):
         """
         сумма длительностей курсов (в неделях)
         """
-        try:
-            return sum([i.course_weeks() for i in self.courses.all()])
-        except TypeError:
-            return None
+        duration = 0
+        for c, s in self.courses_with_closest_sessions:
+            d = s.get_duration() if s else c.duration
+            if not d:
+                return 0
+            duration += d
+        return duration
+
+    @cached_property
+    def whole_work(self):
+        work = 0
+        for c, s in self.courses_with_closest_sessions:
+            if s:
+                w = (s.get_duration() or 0) * (s.get_workload() or 0)
+            else:
+                w = (c.duration or 0) * (c.workload or 0)
+            if not w:
+                return 0
+            work += w
+        return work
+
+    @property
+    def workload(self):
+        work = self.whole_work
+        duration = self.duration
+        if self.duration:
+            return int(round(float(work) / duration, 0))
+        return 0
 
     @property
     def instructors(self):

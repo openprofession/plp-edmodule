@@ -142,6 +142,10 @@ def update_context_with_modules(context, user):
     else:
         modules = EducationalModule.objects.none()
     context['modules'] = modules
+    current = context['courses_current']
+    finished = context['courses_finished']
+    future = context['courses_feature']
+    context['courses_all'] = current + future + finished
 
 
 def update_course_details_context(context, user):
@@ -178,13 +182,13 @@ def update_course_details_context(context, user):
                 ]
             if courses:
                 if len(courses) > 1 and len(related):
-                    sample = random.sample(courses, 2)
+                    sample = [course_set_attrs(i) for i in random.sample(courses, 2)]
                     related = [
                         {'type': 'course', 'item': sample[0]},
                         {'type': 'course', 'item': sample[1]}
                     ]
                 else:
-                    related.append({'type': 'course', 'item': courses[0]})
+                    related.append({'type': 'course', 'item': course_set_attrs(courses[0])})
         obj = course_set_attrs(context['object'])
         context.update({
             'object': obj,
