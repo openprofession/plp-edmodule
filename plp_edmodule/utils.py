@@ -230,7 +230,7 @@ def course_set_attrs(instance):
             result.append({
                 'title': item.comp.title,
                 'children': ch,
-                'percent': round(float(len(ch)) / item.children_count, 2),
+                'percent': int(round(float(len(ch)) / item.children_count, 2) * 100),
             })
         return result
 
