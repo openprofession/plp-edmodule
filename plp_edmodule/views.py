@@ -106,7 +106,7 @@ def module_page(request, code):
         'courses': [course_set_attrs(i) for i in module.courses.all()],
         'authors': u', '.join([i.title for i in authors]),
         'partners': u', '.join([i.title for i in partners]),
-        'authors_and_partners': authors + partners,
+        'authors_and_partners': module.get_authors_and_partners(),
         'profits': module.get_module_profit(),
         'related': module.get_related(),
         'price_data': module.get_price_list(),
