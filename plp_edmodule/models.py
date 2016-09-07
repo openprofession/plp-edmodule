@@ -110,6 +110,13 @@ class EducationalModule(models.Model):
     def get_partners(self):
         return self._get_sorted('partners')
 
+    def get_authors_and_partners(self):
+        result = []
+        for i in self.get_authors() + self.get_partners():
+            if not i in result:
+                result.append(i)
+        return result
+
     def _get_sorted(self, attr):
         d = {}
         for c in self.courses_extended.prefetch_related(attr):

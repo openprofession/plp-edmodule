@@ -208,7 +208,11 @@ def course_set_attrs(instance):
     def _get_authors_and_partners(self):
         try:
             extended = self.extended_params
-            return list(extended.authors.all()) + list(extended.partners.all())
+            result = []
+            for i in list(extended.authors.all()) + list(extended.partners.all()):
+                if i not in result:
+                    result.append(i)
+            return result
         except CourseExtendedParameters.DoesNotExist:
             return []
 
