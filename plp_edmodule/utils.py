@@ -3,6 +3,8 @@
 import logging
 import requests
 import types
+from collections import defaultdict
+from django.db.models import Count
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.urlresolvers import reverse
@@ -12,6 +14,7 @@ from raven import Client
 from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunicationError, EDXEnrollmentError
 from plp.models import CourseSession
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
+from plp_eduplanner.models import CourseComp
 from .models import EducationalModuleProgress, EducationalModuleRating, EducationalModule
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
@@ -216,6 +219,21 @@ def course_set_attrs(instance):
         except CourseExtendedParameters.DoesNotExist:
             return []
 
+    def _get_comps(self):
+        comps = CourseComp.objects.filter(course__id=self.id).select_related('comp')
+        children = defaultdict(list)
+        for i in comps.filter(comp__level=1):
+            children[i.comp.parent_id].append(i.comp)
+        result = []
+        for item in comps.filter(comp__level=0).annotate(children_count=Count('comp__children')):
+            ch = [child.title for child in children.get(item.comp.id, [])]
+            result.append({
+                'title': item.comp.title,
+                'children': ch,
+                'percent': round(float(len(ch)) / item.children_count, 2),
+            })
+        return result
+
     new_methods = {
         'get_next_session': _get_next_session,
         'course_status_params': _get_course_status_params,
@@ -223,6 +241,7 @@ def course_set_attrs(instance):
         'get_profit': _get_profit,
         'get_documents': _get_documents,
         'get_authors_and_partners': _get_authors_and_partners,
+        'get_competencies': _get_comps,
     }
 
     for name, method in new_methods.iteritems():

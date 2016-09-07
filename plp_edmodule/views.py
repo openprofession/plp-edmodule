@@ -198,6 +198,7 @@ def update_course_details_context(context, user):
             'profits': [i.strip() for i in profits.splitlines() if i.strip()],
             'schedule': course_extended.themes,
             'related': related,
+            'comps': obj.get_competencies(),
         })
     except CourseExtendedParameters.DoesNotExist:
         pass
