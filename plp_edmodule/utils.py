@@ -4,7 +4,7 @@ import logging
 import requests
 import types
 from collections import defaultdict
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.urlresolvers import reverse
@@ -12,10 +12,11 @@ from django.utils import timezone
 from django.utils.translation import ugettext as _
 from raven import Client
 from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunicationError, EDXEnrollmentError
-from plp.models import CourseSession
+from plp.models import CourseSession, Participant
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
+from plp_extension.apps.module_extension.models import EducationalModuleExtendedParameters
 from plp_eduplanner.models import CourseComp
-from .models import EducationalModuleProgress, EducationalModuleRating, EducationalModule
+from .models import EducationalModuleProgress, EducationalModuleRating, EducationalModule, EducationalModuleEnrollment
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
 client = None
@@ -271,3 +272,41 @@ def button_status_project(session, user):
                 link=reverse('edmodule-page', kwargs={'code': containing_module.code}))
         status.update({'text': text, 'active': may_enroll})
     return status
+
+
+def update_modules_graduation(user, sessions):
+    """
+    Апдейт EducationalModuleEnrollment.is_graduated по оконченным сессиям по контексту моих курсов,
+    т.е. у sessions должен быть параметр certificate_data
+    """
+    not_passed_modules = {}
+    for enr in EducationalModuleEnrollment.objects.filter(user=user, is_graduated=False):
+        not_passed_modules[enr.id] = set(enr.module.courses.values_list('id', flat=True))
+    passed_courses = set()
+    for s in sessions:
+        if getattr(s, 'certificate_data', None) and s.certificate_data.get('passed'):
+            passed_courses.add(s.course_id)
+    to_update = []
+    for m_id, courses in not_passed_modules.iteritems():
+        if courses.issubset(passed_courses):
+            to_update.append(m_id)
+    EducationalModuleEnrollment.objects.filter(user=user, id__in=to_update).update(is_graduated=True)
+
+
+def count_user_score(user):
+    """
+    Подсчет баллов пользователя за пройденные курсы и модули
+    """
+    passed_courses = Participant.objects.filter(user=user, is_graduate=True).values_list('session__course__id', flat=True).distinct()
+    courses = CourseExtendedParameters.objects.filter(course__id__in=passed_courses).aggregate(score=Sum('course_experience'))
+    course_score = courses['score'] or 0
+    passed_modules = EducationalModuleEnrollment.objects.filter(user=user, is_graduated=True).values_list('module__id')
+    modules = EducationalModuleExtendedParameters.objects.filter(module__id__in=passed_modules).aggregate(score=Sum('em_experience'))
+    module_score = modules['score'] or 0
+    return {
+        'module_score': module_score,
+        'passed_modules': len(passed_modules),
+        'passed_courses': len(passed_courses),
+        'course_score': course_score,
+        'whole_score': course_score + module_score,
+    }

@@ -21,7 +21,8 @@ from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
-from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict
+from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict, \
+    count_user_score, update_modules_graduation
 from .signals import edmodule_enrolled
 
 
@@ -146,6 +147,9 @@ def update_context_with_modules(context, user):
     finished = context['courses_finished']
     future = context['courses_feature']
     context['courses_all'] = current + future + finished
+    update_modules_graduation(user, context['courses_finished'])
+    context['score'] = count_user_score(user)
+    context['count_certificates'] = Participant.objects.filter(user=user, is_graduate=True).count()
 
 
 def update_course_details_context(context, user):
