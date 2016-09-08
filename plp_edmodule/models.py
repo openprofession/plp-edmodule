@@ -149,6 +149,7 @@ class EducationalModule(models.Model):
         """
         получение похожих курсов и специализаций (от 0 до 2)
         """
+        from .utils import course_set_attrs
         categories = self.categories
         if not categories:
             return []
@@ -158,13 +159,13 @@ class EducationalModule(models.Model):
             extended_params__categories__in=categories).distinct()
         if modules:
             return [{'type': 'em', 'item': random.sample(modules, 1)[0]},
-                    {'type': 'course', 'item': random.sample(courses, 1)[0]}]
+                    {'type': 'course', 'item': course_set_attrs(random.sample(courses, 1)[0])}]
         elif courses:
             if len(courses) > 1:
-                sample = random.sample(courses, 2)
+                sample = [course_set_attrs(i) for i in random.sample(courses, 2)]
                 return [{'type': 'course', 'item': sample[0]},
                         {'type': 'course', 'item': sample[1]}]
-            return [{'type': 'course', 'item': courses[0]}]
+            return [{'type': 'course', 'item': course_set_attrs(courses[0])}]
         return []
 
     def get_sessions(self):

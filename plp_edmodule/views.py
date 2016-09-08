@@ -371,7 +371,7 @@ def edmodule_catalog_view(request, category=None):
         max_length = CourseExtendedParameters._meta.get_field('short_description').max_length
         default_desc = strip_tags(strip_spaces_between_tags(c.description or ''))
         dic.update({
-            'authors_and_partners': [{'url': i.link, 'title': i.title} for i in c.get_authors_and_partners()],
+            'authors_and_partners': [{'url': i.link, 'title': i.abbr or i.title} for i in c.get_authors_and_partners()],
             'catalog_marker': getattr(c, 'catalog_marker', ''),
             'short_description': getattr(c, 'short_description', '') or Truncator(default_desc).chars(max_length),
         })
