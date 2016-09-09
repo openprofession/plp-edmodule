@@ -1,6 +1,7 @@
 # coding: utf-8
 
 from plp.notifications.base import MassSendEmails
+from plp.utils.helpers import get_prefix_and_site
 from .models import EducationalModule, EducationalModuleEnrollment
 
 
@@ -27,12 +28,14 @@ class EdmoduleCourseStartsEmails(MassSendEmails):
         return list(set(self.enrollment_by_email.keys()))
 
     def get_context(self, email=None):
-        return {
+        context = {
             'module': self.enrollment_by_email[email].module,
             'user': self.enrollment_by_email[email].user,
             'course': self.session.course,
-            'site': self.get_site()
+            'site_url': self.get_site()
         }
+        context.update(get_prefix_and_site())
+        return context
 
 
 class EdmoduleCourseEnrollEndsEmails(EdmoduleCourseStartsEmails):
