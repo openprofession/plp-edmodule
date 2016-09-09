@@ -4,7 +4,7 @@ from django.conf import settings
 from django.dispatch import Signal
 from django.template.loader import get_template
 from emails.django import Message
-from plp.utils.helpers import get_domain_url
+from plp.utils.helpers import get_domain_url, get_prefix_and_site
 
 edmodule_enrolled = Signal(providing_args=['instance'])
 edmodule_unenrolled = Signal(providing_args=['instance'])
@@ -25,7 +25,8 @@ def edmodule_enrolled_handler(**kwargs):
             mail_from=settings.EMAIL_NOTIFICATIONS_FROM,
             mail_to=(user.get_full_name(), user.email)
         )
-        context = {'module': instance.module, 'user': user, 'site': get_domain_url()}
+        context = {'module': instance.module, 'user': user, 'site_url': get_domain_url()}
+        context.update(get_prefix_and_site())
         msg.send(context={'context': context})
 
 
@@ -43,7 +44,8 @@ def edmodule_unenrolled_handler(**kwargs):
             mail_from=settings.EMAIL_NOTIFICATIONS_FROM,
             mail_to=(user.get_full_name(), user.email)
         )
-        context = {'module': instance.module, 'user': user, 'site': get_domain_url()}
+        context = {'module': instance.module, 'user': user, 'site_url': get_domain_url()}
+        context.update(get_prefix_and_site())
         msg.send(context={'context': context})
 
 
@@ -62,5 +64,6 @@ def edmodule_payed_handler(**kwargs):
             mail_from=settings.EMAIL_NOTIFICATIONS_FROM,
             mail_to=(user.get_full_name(), user.email)
         )
-        context = {'module': module, 'user': user, 'site': get_domain_url()}
+        context = {'module': module, 'user': user, 'site_url': get_domain_url()}
+        context.update(get_prefix_and_site())
         msg.send(context={'context': context})
