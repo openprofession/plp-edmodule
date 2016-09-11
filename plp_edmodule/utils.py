@@ -15,7 +15,7 @@ from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunic
 from plp.models import CourseSession, Participant
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.models import EducationalModuleExtendedParameters
-from plp_eduplanner.models import CourseComp
+from plp_eduplanner.models import CourseComp, Competence
 from .models import EducationalModuleProgress, EducationalModuleRating, EducationalModule, EducationalModuleEnrollment
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
@@ -223,17 +223,21 @@ def course_set_attrs(instance):
     def _get_comps(self):
         comps = CourseComp.objects.filter(course__id=self.id).select_related('comp')
         children = defaultdict(list)
-        for i in comps.filter(comp__level=1):
+        for i in comps.filter(comp__level=2):
             children[i.comp.parent_id].append(i.comp)
         result = []
-        for item in comps.filter(comp__level=0).annotate(children_count=Count('comp__children')):
-            ch = [child.title for child in children.get(item.comp.id, [])]
+        for item in Competence.objects.filter(id__in=children.keys()).annotate(children_count=Count('children')):
+            ch = [child.title for child in children.get(item.id, [])]
             result.append({
-                'title': item.comp.title,
+                'title': item.title,
                 'children': ch,
                 'percent': int(round(float(len(ch)) / item.children_count, 2) * 100),
             })
         return result
+
+    def _get_course_format_list(self):
+        val = self.course_format or ''
+        return [i.strip() for i in val.splitlines() if i.strip()]
 
     new_methods = {
         'get_next_session': _get_next_session,
@@ -243,6 +247,7 @@ def course_set_attrs(instance):
         'get_documents': _get_documents,
         'get_authors_and_partners': _get_authors_and_partners,
         'get_competencies': _get_comps,
+        'get_course_format_list': _get_course_format_list,
     }
 
     for name, method in new_methods.iteritems():
