@@ -235,6 +235,10 @@ def course_set_attrs(instance):
             })
         return result
 
+    def _get_course_format_list(self):
+        val = self.course_format or ''
+        return [i.strip() for i in val.splitlines() if i.strip()]
+
     new_methods = {
         'get_next_session': _get_next_session,
         'course_status_params': _get_course_status_params,
@@ -243,6 +247,7 @@ def course_set_attrs(instance):
         'get_documents': _get_documents,
         'get_authors_and_partners': _get_authors_and_partners,
         'get_competencies': _get_comps,
+        'get_course_format_list': _get_course_format_list,
     }
 
     for name, method in new_methods.iteritems():
