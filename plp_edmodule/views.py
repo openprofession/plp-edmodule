@@ -223,45 +223,55 @@ def update_frontpage_context(context):
             categories=c, is_dpo=True, course__id__in=course_ids).values_list('course__id', flat=True))
 
     objects, objects_ids = [], []
+    CNT_COURSES = 5
     for c, ids in by_category.iteritems():
-        if len(objects) > 5:
+        if len(objects) >= CNT_COURSES:
             break
-        modules = EducationalModule.objects.filter(
-            status=PUBLISHED,
-            courses__id__in=ids,
-        ).prefetch_related('courses')
-        added_module = False
-        for m in modules:
-            if m.may_enroll() and ('em', m.id) not in objects_ids:
-                objects.append({'type': 'em', 'item': m})
-                objects_ids.append(('em', m.id))
-                added_module = True
-                break
-        if added_module:
-            continue
-        c = Course.objects.filter(id__in=ids).first()
+        # modules = EducationalModule.objects.filter(
+        #     status=PUBLISHED,
+        #     courses__id__in=ids,
+        # ).prefetch_related('courses')
+        # added_module = False
+        # for m in modules:
+        #     if m.may_enroll() and ('em', m.id) not in objects_ids:
+        #         objects.append({'type': 'em', 'item': m})
+        #         objects_ids.append(('em', m.id))
+        #         added_module = True
+        #         break
+        # if added_module:
+        #     continue
+        added = [i[1] for i in objects_ids]
+        c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_ids:
             objects.append({'type': 'course', 'item': course_set_attrs(c)})
             objects_ids.append(('course', c.id))
+    num_to_add = CNT_COURSES - len(objects)
+    # добавляем рандомные курсы
+    if num_to_add:
+        added = [i[1] for i in objects_ids]
+        for c in Course.objects.filter(status=PUBLISHED).exclude(id__in=added).order_by('?')[:num_to_add]:
+            objects.append({'type': 'course', 'item': course_set_attrs(c)})
+
 
     objects_dpo, objects_dpo_ids = [], []
     for c, ids in by_category_dpo.iteritems():
         if len(objects_dpo) > 5:
             break
-        modules = EducationalModule.objects.filter(
-            status=PUBLISHED,
-            courses__in=ids,
-        ).prefetch_related('courses')
-        added_module = False
-        for m in modules:
-            if m.may_enroll() and ('em', m.id) not in objects_dpo_ids:
-                objects_dpo.append({'type': 'em', 'item': m})
-                objects_dpo_ids.append(('em', m.id))
-                added_module = True
-                break
-        if added_module:
-            continue
-        c = Course.objects.filter(id__in=ids).first()
+        # modules = EducationalModule.objects.filter(
+        #     status=PUBLISHED,
+        #     courses__in=ids,
+        # ).prefetch_related('courses')
+        # added_module = False
+        # for m in modules:
+        #     if m.may_enroll() and ('em', m.id) not in objects_dpo_ids:
+        #         objects_dpo.append({'type': 'em', 'item': m})
+        #         objects_dpo_ids.append(('em', m.id))
+        #         added_module = True
+        #         break
+        # if added_module:
+        #     continue
+        added = [i[1] for i in objects_dpo_ids]
+        c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_dpo_ids:
             objects_dpo.append({'type': 'course', 'item': course_set_attrs(c)})
             objects_dpo_ids.append(('course', c.id))
