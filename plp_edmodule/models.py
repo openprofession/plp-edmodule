@@ -264,6 +264,14 @@ class EducationalModule(models.Model):
                 passed[course_id] = True
         return all(i for i in passed.values())
 
+    @property
+    def review_count(self):
+        return EducationalModuleRating.objects.filter(object_id=self.id).count()
+
+    def get_courses(self):
+        from .utils import course_set_attrs
+        return [course_set_attrs(i) for i in self.courses.all()]
+
 
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
