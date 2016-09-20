@@ -157,16 +157,17 @@ class EducationalModule(models.Model):
             courses__extended_params__categories__in=categories).distinct()
         courses = Course.objects.exclude(id__in=self.courses.values_list('id', flat=True)).filter(
             extended_params__categories__in=categories).distinct()
+        related = []
         if modules:
-            return [{'type': 'em', 'item': random.sample(modules, 1)[0]},
-                    {'type': 'course', 'item': course_set_attrs(random.sample(courses, 1)[0])}]
-        elif courses:
-            if len(courses) > 1:
-                sample = [course_set_attrs(i) for i in random.sample(courses, 2)]
-                return [{'type': 'course', 'item': sample[0]},
-                        {'type': 'course', 'item': sample[1]}]
-            return [{'type': 'course', 'item': course_set_attrs(courses[0])}]
-        return []
+            related.append({'type': 'em', 'item': random.sample(modules, 1)[0]})
+        if courses:
+            sample = [course_set_attrs(i) for i in random.sample(courses, min(len(courses), 2))]
+            for i in range(2 - len(related)):
+                try:
+                    related.append(sample[i])
+                except IndexError:
+                    pass
+        return related
 
     def get_sessions(self):
         """
