@@ -119,6 +119,7 @@ def module_page(request, code):
         'feedback_list': get_feedback_list(module),
         'instructors': module.instructors,
         'authenticated': request.user.is_authenticated(),
+        'professions': module.related_professions,
     })
 
 

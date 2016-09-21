@@ -1,7 +1,9 @@
 # coding: utf-8
 
 import random
+from collections import defaultdict, OrderedDict
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.core import validators
 from django.db import models
 from django.utils.functional import cached_property
@@ -11,10 +13,11 @@ from sortedm2m.fields import SortedManyToManyField
 from plp.models import Course, User, SessionEnrollmentType, Participant
 from plp_extension.apps.course_review.models import AbstractRating
 from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
-from plp_extension.apps.module_extension.models import DEFAULT_COVER_SIZE
+from plp_extension.apps.module_extension.models import DEFAULT_COVER_SIZE, EducationalModuleExtendedParameters
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_payed, edmodule_payed_handler, \
     edmodule_unenrolled, edmodule_unenrolled_handler
+from plp_eduplanner import models as edu_models
 
 HIDDEN = 'hidden'
 PUBLISHED = 'published'
@@ -48,6 +51,16 @@ class EducationalModule(models.Model):
 
     def __unicode__(self):
         return u'%s - %s' % (self.code, ', '.join(self.courses.values_list('slug', flat=True)))
+
+    def __init__(self, *args, **kwargs):
+        super(EducationalModule, self).__init__(*args, **kwargs)
+        try:
+            ext = self.extended_params
+        except EducationalModuleExtendedParameters.DoesNotExist:
+            ext = None
+        for field in EducationalModuleExtendedParameters._meta.fields:
+            if not field.auto_created and field.editable:
+                setattr(self, field.name, getattr(ext, field.name) if ext else None)
 
     @cached_property
     def duration(self):
@@ -90,7 +103,7 @@ class EducationalModule(models.Model):
         упорядочивание по частоте вхождения в сессии, на которые мы записываем пользователя
         """
         d = {}
-        for c in self.courses.all():
+        for c in self.get_courses():
             if c.next_session:
                 for i in c.next_session.get_instructors():
                     d[i] = d.get(i, 0) + 1
@@ -164,16 +177,10 @@ class EducationalModule(models.Model):
             sample = [course_set_attrs(i) for i in random.sample(courses, min(len(courses), 2))]
             for i in range(2 - len(related)):
                 try:
-                    related.append(sample[i])
+                    related.append({'type': 'course', 'item': sample[i]})
                 except IndexError:
                     pass
         return related
-
-    def get_sessions(self):
-        """
-        хелпер для выбора сессий
-        """
-        return [i.next_session for i in self.courses.all()]
 
     @cached_property
     def courses_extended(self):
@@ -200,7 +207,7 @@ class EducationalModule(models.Model):
         types = dict([(i.session.id, i.price) for i in
                       SessionEnrollmentType.objects.filter(session__course__in=self.courses.all(), mode='verified')])
         result = {'courses': []}
-        for c in self.courses.all():
+        for c in self.get_courses():
             s = c.next_session
             if s:
                 result['courses'].append((c, types.get(s.id)))
@@ -219,7 +226,10 @@ class EducationalModule(models.Model):
         return result
 
     def get_start_date(self):
-        c = self.courses.first()
+        c = self.get_courses()
+        if not c:
+            return None
+        c = c[0]
         if c.next_session:
             return c.next_session.datetime_starts
 
@@ -232,13 +242,11 @@ class EducationalModule(models.Model):
 
     @property
     def count_courses(self):
-        return self.courses.count()
+        return len(self.get_courses())
 
     @cached_property
     def courses_with_closest_sessions(self):
-        from .utils import choose_closest_session
-        courses = self.courses.exclude(extended_params__is_project=True)
-        return [(c, choose_closest_session(c)) for c in courses]
+        return [(c, c.next_session) for c in self.get_courses()]
 
     def get_closest_course_with_session(self):
         courses = self.courses_with_closest_sessions
@@ -270,8 +278,94 @@ class EducationalModule(models.Model):
         return EducationalModuleRating.objects.filter(object_id=self.id).count()
 
     def get_courses(self):
+        return self._all_courses
+
+    @cached_property
+    def _all_courses(self):
         from .utils import course_set_attrs
         return [course_set_attrs(i) for i in self.courses.all()]
+
+    @cached_property
+    def related_professions(self):
+        """
+        Получение профессий, соответствующих образовательному модулю
+        Метод отбора: для каждой профессии выбирается список ее курсов, который бы увидел
+        неавторизованный пользователь (или просто без компетенций), если ВСЕ курсы модуля
+        содержатся в этом списке, то такая профессия соответствует модулю
+        """
+        user = AnonymousUser()
+        related = edu_models.ProfessionComp.objects.filter(profession__is_public=True, comp__is_public=True).\
+            select_related('comp__parent', 'profession__id')
+        related_dict = defaultdict(list)
+        for i in related:
+            related_dict[i.profession.id].append(i)
+        prof_comps_dict, required_dict, required_set_dict = {}, {}, {}
+        user_comps = {}
+        for k, v in related_dict.iteritems():
+            prof_comps = {x.comp_id: x.rate for x in v}
+            tmp = edu_models.Competence.get_required_comps(prof_comps, user_comps)
+            required_dict[k] = tmp
+            required_set_dict[k] = set(tmp.keys())
+        qs = Course.objects.filter(status=PUBLISHED, competencies__isnull=False).prefetch_related('competencies')
+        # т.к. нет приоритезации для курсов с одинаковыми компетенциями, придерживаемся того порядка курсов,
+        # который используется при построении учебного плана на странице профессии
+        course_dict = OrderedDict([(course, [i.comp_id for i in course.competencies.all()]) for course in qs])
+        expected_courses_dict = {}
+        for prof_id, comps in required_dict.iteritems():
+            courses = [c for c, ids in course_dict.iteritems() if set(ids).intersection(set(comps))]
+            courses = sorted(courses,
+                key=lambda x: len(required_set_dict[prof_id] - set([x.comp_id for x in x.competencies.all()])))
+            expected_courses_dict[prof_id] = courses
+        prof_courses = {}
+        for i in expected_courses_dict.keys():
+            prof_courses[i] = [c for c, __ in
+                               edu_models.Competence.get_plan(expected_courses_dict[i], required_dict[i].copy(), user)]
+        module_courses = set([i.id for i in self.courses.all()])
+        professions = [prof for prof, courses in prof_courses.iteritems()
+                       if module_courses.issubset(set([i.id for i in courses]))]
+        return edu_models.Profession.objects.filter(id__in=professions)
+
+    def get_requirements(self):
+        val = getattr(self, 'requirements', None)
+        return [i.strip() for i in val.splitlines() if i.strip()] if val else []
+
+    def get_profit(self):
+        val = getattr(self, 'profit', None)
+        return [i.strip() for i in val.splitlines() if i.strip()] if val else []
+
+    def get_documents(self):
+        val = getattr(self, 'documents', None)
+        return [i.strip() for i in val.splitlines() if i.strip()] if val else []
+
+    def get_competencies(self):
+        """
+        Компетенции образовательного модуля
+        :returns список словарей вида {
+            title: строка,
+            children: массив строк,
+            percent: число [0, 100]
+            root_title: строка (название компетенции верхнего уровня)
+        }
+        """
+        comps = edu_models.CourseComp.objects.filter(course__id__in=[i.id for i in self.courses.all()]).\
+            select_related('comp', 'comp__parent__parent__title').distinct()
+        children = defaultdict(list)
+        root_name = {}
+        for i in comps.filter(comp__level=2):
+            children[i.comp.parent_id].append(i.comp)
+            root_name[i.comp.parent_id] = i.comp.parent.parent.title
+        result = []
+        for item in edu_models.Competence.objects.filter(id__in=children.keys()).annotate(
+                children_count=models.Count('children')):
+            ch = [child.title for child in children.get(item.id, [])]
+            result.append({
+                'title': item.title,
+                'children': ch,
+                'percent': int(round(float(len(ch)) / item.children_count, 2) * 100),
+                'root_title': root_name.get(item.id),
+            })
+        result = sorted(result, key=lambda x: x['root_title'])
+        return result
 
 
 class EducationalModuleEnrollment(models.Model):
