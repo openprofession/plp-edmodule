@@ -6,6 +6,7 @@ import random
 import logging
 from django.conf import settings
 from django.db.models import Count
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.storage import default_storage
 from django.core.urlresolvers import reverse
 from django.http import JsonResponse, Http404
@@ -168,6 +169,13 @@ def update_course_details_context(context, user):
     """
     modules = EducationalModule.objects.filter(courses=context['object']).distinct()
     context['modules'] = modules
+    session = context['session']
+    if session and getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
+        from opro_payments.models import UpsaleLink
+        ctype = ContentType.objects.get_for_model(session)
+        upsale_links = UpsaleLink.objects.filter(content_type=ctype, object_id=session.id, is_active=True)\
+            .select_related('upsale')
+        context.update({'upsale_links': upsale_links})
     try:
         course_extended = context['object'].extended_params
         authors = list(course_extended.authors.all())

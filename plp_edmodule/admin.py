@@ -4,6 +4,7 @@ from django.contrib import admin
 from django import forms
 from django.utils.translation import ugettext_lazy as _
 from autocomplete_light import modelform_factory
+from statistics.admin import RemoveDeleteActionMixin
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.admin import EducationalModuleExtendedInline
 from .models import EducationalModule, EducationalModuleEnrollment
@@ -27,7 +28,7 @@ class EducationalModuleAdminForm(forms.ModelForm):
         return courses
 
 
-class EducationalModuleAdmin(admin.ModelAdmin):
+class EducationalModuleAdmin(RemoveDeleteActionMixin, admin.ModelAdmin):
     form = EducationalModuleAdminForm
     inlines = [EducationalModuleExtendedInline]
     readonly_fields = ('sum_ratings', 'count_ratings')
