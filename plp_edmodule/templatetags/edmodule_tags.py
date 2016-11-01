@@ -2,6 +2,7 @@
 
 from django import template
 from plp.models import Participant
+from ..utils import course_set_attrs
 
 register = template.Library()
 
@@ -29,4 +30,5 @@ def enroll_button(context, course, session=None):
         'course_id': session.get_absolute_slug() if session else course.course_id(),
         'title': course.title,
         'request': context['request'],
+        'course': course_set_attrs(course),
     }
