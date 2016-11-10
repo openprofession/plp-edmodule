@@ -7,7 +7,7 @@ from autocomplete_light import modelform_factory
 from statistics.admin import RemoveDeleteActionMixin
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.admin import EducationalModuleExtendedInline
-from .models import EducationalModule, EducationalModuleEnrollment
+from .models import EducationalModule, EducationalModuleEnrollment, EducationalModuleEnrollmentType
 
 
 class EducationalModuleAdminForm(forms.ModelForm):
@@ -41,3 +41,4 @@ class EducationalModuleEnrollmentAdmin(admin.ModelAdmin):
 
 admin.site.register(EducationalModule, EducationalModuleAdmin)
 admin.site.register(EducationalModuleEnrollment, EducationalModuleEnrollmentAdmin)
+admin.site.register(EducationalModuleEnrollmentType)
