@@ -309,6 +309,9 @@ class EducationalModuleEnrollment(models.Model):
         verbose_name_plural = _(u'Записи на модуль')
         unique_together = ('user', 'module')
 
+    def __unicode__(self):
+        return u'%s - %s' % (self.user, self.module)
+
 
 class EducationalModuleProgress(models.Model):
     enrollment = models.OneToOneField(EducationalModuleEnrollment, verbose_name=_(u'Запись на модуль'),
@@ -358,6 +361,9 @@ class EducationalModuleEnrollmentType(models.Model):
         verbose_name_plural = _(u'Варианты прохождения модуля')
         unique_together = (("module", "mode"),)
 
+    def __unicode__(self):
+        return u'%s - %s - %s' % (self.module, self.mode, self.price)
+
 
 class EducationalModuleEnrollmentReason(models.Model):
     class PAYMENT_TYPE:
@@ -378,6 +384,7 @@ class EducationalModuleEnrollmentReason(models.Model):
                                         verbose_name=_(u'Номер договора'))
     payment_descriptions = models.TextField(null=True, blank=True, help_text=_(u'Комментарий к платежу'),
                                             verbose_name=_(u'Описание платежа'))
+    full_paid = models.BooleanField(verbose_name=_(u'Специализация оплачена полностью'), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
