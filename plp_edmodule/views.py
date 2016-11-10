@@ -103,6 +103,14 @@ def module_page(request, code):
     # TODO: catalog_link
     # catalog_link = reverse('modules_catalog') + '?' + '&'.join(['cat=%s' % i.code for i in module.categories])
     catalog_link = ''
+    upsale_links = []
+    if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
+        from opro_payments.models import UpsaleLink
+        upsale_links = UpsaleLink.objects.filter(
+            object_id=module.id,
+            content_type=ContentType.objects.get_for_model(module),
+            is_active=True,
+        ).select_related('upsale')
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
         'courses': [course_set_attrs(i) for i in module.courses.all()],
@@ -120,6 +128,7 @@ def module_page(request, code):
         'feedback_list': get_feedback_list(module),
         'instructors': module.instructors,
         'authenticated': request.user.is_authenticated(),
+        'upsale_links': upsale_links,
     })
 
 
