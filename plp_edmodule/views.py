@@ -119,7 +119,7 @@ def module_page(request, code):
         'authors_and_partners': module.get_authors_and_partners(),
         'profits': module.get_module_profit(),
         'related': module.get_related(),
-        'price_data': module.get_price_list(),
+        'price_data': module.get_price_list(request.user),
         'schedule': module.get_schedule(),
         'rating': module.get_rating(),
         'count_ratings': module.count_ratings,

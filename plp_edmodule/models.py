@@ -10,7 +10,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from sortedm2m.fields import SortedManyToManyField
-from plp.models import Course, User, SessionEnrollmentType, Participant, CourseSession
+from plp.models import Course, User, SessionEnrollmentType, Participant, CourseSession, EnrollmentReason
 from plp_extension.apps.course_review.models import AbstractRating
 from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
 from plp_extension.apps.module_extension.models import DEFAULT_COVER_SIZE
@@ -189,7 +189,7 @@ class EducationalModule(models.Model):
         data = [i.strip() for i in data if i.strip()]
         return list(set(data))
 
-    def get_price_list(self):
+    def get_price_list(self, for_user=None):
         """
         :return: {
             'courses': [(курс(Course), цена(int), ...],
@@ -202,11 +202,18 @@ class EducationalModule(models.Model):
         # берем цену ближайшей сессии, на которую можно записаться, или предыдущей
         session_for_course = {}
         now = timezone.now()
+        exclude = {}
+        if for_user and for_user.is_authenticated():
+            # если пользователь платил за какую-то сессию курса, цена курса для него 0
+            exclude['id__in'] = list(EnrollmentReason.objects.filter(
+                participant__user=for_user,
+                session_enrollment_type__mode='verified'
+            ).values_list('participant__session__course__id', flat=True))
         sessions = CourseSession.objects.filter(
-            course__in=courses,
+            course__in=courses.exclude(**exclude),
             datetime_end_enroll__isnull=False,
             datetime_start_enroll__lt=now
-        ).order_by('-datetime_end_enroll')
+        ).exclude(**exclude).order_by('-datetime_end_enroll')
         courses_with_sessions = defaultdict(list)
         for s in sessions:
             courses_with_sessions[s.course_id].append(s)
@@ -254,11 +261,10 @@ class EducationalModule(models.Model):
         return [(c, choose_closest_session(c)) for c in courses]
 
     def get_closest_course_with_session(self):
-        courses = self.courses_with_closest_sessions
-        courses = filter(lambda x: x[1] and x[1].datetime_starts, courses)
-        courses = sorted(courses, key=lambda x: x[1].datetime_starts)
-        if courses:
-            return courses[0]
+        for c in self.courses.filter(extended_params__is_project=False):
+            session = c.next_session
+            if session and session.get_verified_mode_enrollment_type():
+                return c, session
 
     def may_enroll(self):
         courses = self.courses_with_closest_sessions
