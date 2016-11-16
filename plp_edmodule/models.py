@@ -189,6 +189,13 @@ class EducationalModule(models.Model):
         data = [i.strip() for i in data if i.strip()]
         return list(set(data))
 
+    def get_requirements(self):
+        try:
+            s = self.extended_params.requirements or ''
+            return [i.strip() for i in s.splitlines() if i.strip()]
+        except:
+            pass
+
     def get_price_list(self, for_user=None):
         """
         :return: {
