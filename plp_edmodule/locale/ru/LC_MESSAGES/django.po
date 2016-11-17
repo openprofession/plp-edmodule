@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-08-29 18:21+0300\n"
+"POT-Creation-Date: 2016-11-17 13:00+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,6 +18,13 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#, python-brace-format
+msgid "Проект {title} уже содержится в другом модуле"
+msgstr ""
+
+msgid "Введите от 1 до 3 элементов, каждый с новой строки"
+msgstr ""
 
 msgid "Скрыт"
 msgstr ""
@@ -37,7 +44,11 @@ msgstr ""
 msgid "Курсы"
 msgstr ""
 
-msgid "Обложка"
+msgid "Обложка EM"
+msgstr ""
+
+#, python-brace-format
+msgid "Минимум {0}*{1}, картинки большего размера будут сжаты до этого размера"
 msgstr ""
 
 msgid "Описание"
@@ -47,6 +58,18 @@ msgid "Стоимость"
 msgstr ""
 
 msgid "Скидка"
+msgstr ""
+
+msgid "Вакансии"
+msgstr ""
+
+msgid "HTML блок"
+msgstr ""
+
+msgid "Подзаголовок"
+msgstr ""
+
+msgid "от 1 до 3 элементов, каждый с новой строки"
 msgstr ""
 
 msgid "Сумма оценок"
@@ -139,6 +162,9 @@ msgstr ""
 msgid "Описание платежа"
 msgstr ""
 
+msgid "Специализация оплачена полностью"
+msgstr ""
+
 msgid "Причина записи"
 msgstr ""
 
@@ -224,7 +250,7 @@ msgstr ""
 #, python-format
 msgid ""
 "Записаться на прохождение курса \"%(title)s\" вы можете здесь: <a href="
-"\"%(site)s%(url)s\">%(site)s%(url)s</a>"
+"\"%(site_url)s%(url)s\">%(site_url)s%(url)s</a>"
 msgstr ""
 
 #, python-format
@@ -254,7 +280,7 @@ msgid ""
 "\n"
 "    Чтобы начать обучение - выберите один из курсов и запишитесь на него на "
 "странице специализации:\n"
-"    <a href=\"%(site)s%(url)s\">%(site)s%(url)s</a>\n"
+"    <a href=\"%(site_url)s%(url)s\">%(site_url)s%(url)s</a>\n"
 "    "
 msgstr ""
 
@@ -268,8 +294,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Чтобы начать обучение перейдите на страницу специализации: <a href=\"%(site)s"
-"%(url)s\">%(site)s%(url)s</a>"
+"Чтобы начать обучение перейдите на страницу специализации: <a href="
+"\"%(site_url)s%(url)s\">%(site_url)s%(url)s</a>"
 msgstr ""
 
 #, python-format
@@ -282,4 +308,54 @@ msgstr ""
 
 #, python-format
 msgid "Вы отписаны от специализации \"%(title)s\""
+msgstr ""
+
+msgid "января"
+msgstr ""
+
+msgid "февраля"
+msgstr ""
+
+msgid "марта"
+msgstr ""
+
+msgid "апреля"
+msgstr ""
+
+msgid "мая"
+msgstr ""
+
+msgid "июня"
+msgstr ""
+
+msgid "июля"
+msgstr ""
+
+msgid "августа"
+msgstr ""
+
+msgid "сенятбря"
+msgstr ""
+
+msgid "октября"
+msgstr ""
+
+msgid "ноября"
+msgstr ""
+
+msgid "декабря"
+msgstr ""
+
+#, python-brace-format
+msgid "начало {day} {month}"
+msgstr ""
+
+#, python-brace-format
+msgid "запись до {day} {month}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Запись на проект в рамках <a href=\"{link}\">модуля</a> доступна при "
+"успешном прохождении всех курсов модуля"
 msgstr ""

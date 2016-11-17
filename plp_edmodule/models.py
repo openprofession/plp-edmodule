@@ -41,6 +41,9 @@ class EducationalModule(models.Model):
         validators.MinValueValidator(0),
         validators.MaxValueValidator(100)
     ])
+    vacancies = models.TextField(verbose_name=_(u'Вакансии'), blank=True, default='', help_text=_(u'HTML блок'))
+    subtitle = models.TextField(verbose_name=_(u'Подзаголовок'), blank=True, default='',
+                                help_text=_(u'от 1 до 3 элементов, каждый с новой строки'))
     sum_ratings = models.PositiveIntegerField(verbose_name=_(u'Сумма оценок'), default=0)
     count_ratings = models.PositiveIntegerField(verbose_name=_(u'Количество оценок'), default=0)
 

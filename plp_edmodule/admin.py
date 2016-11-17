@@ -32,6 +32,12 @@ class EducationalModuleAdminForm(forms.ModelForm):
                         ))
         return courses
 
+    def clean_subtitle(self):
+        val = self.cleaned_data.get('subtitle')
+        if val and not (1 <= len([i for i in val.splitlines() if i.strip()]) <= 3):
+            raise forms.ValidationError(_(u'Введите от 1 до 3 элементов, каждый с новой строки'))
+        return val
+
 
 class EducationalModuleAdmin(RemoveDeleteActionMixin, admin.ModelAdmin):
     form = EducationalModuleAdminForm
