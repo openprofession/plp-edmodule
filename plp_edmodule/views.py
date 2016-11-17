@@ -103,6 +103,14 @@ def module_page(request, code):
     # TODO: catalog_link
     # catalog_link = reverse('modules_catalog') + '?' + '&'.join(['cat=%s' % i.code for i in module.categories])
     catalog_link = ''
+    upsale_links = []
+    if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
+        from opro_payments.models import UpsaleLink
+        upsale_links = UpsaleLink.objects.filter(
+            object_id=module.id,
+            content_type=ContentType.objects.get_for_model(module),
+            is_active=True,
+        ).select_related('upsale')
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
         'courses': [course_set_attrs(i) for i in module.courses.all()],
@@ -111,7 +119,7 @@ def module_page(request, code):
         'authors_and_partners': module.get_authors_and_partners(),
         'profits': module.get_module_profit(),
         'related': module.get_related(),
-        'price_data': module.get_price_list(),
+        'price_data': module.get_price_list(request.user),
         'schedule': module.get_schedule(),
         'rating': module.get_rating(),
         'count_ratings': module.count_ratings,
@@ -120,6 +128,7 @@ def module_page(request, code):
         'feedback_list': get_feedback_list(module),
         'instructors': module.instructors,
         'authenticated': request.user.is_authenticated(),
+        'upsale_links': upsale_links,
     })
 
 
@@ -235,19 +244,19 @@ def update_frontpage_context(context):
     for c, ids in by_category.iteritems():
         if len(objects) >= CNT_COURSES:
             break
-        # modules = EducationalModule.objects.filter(
-        #     status=PUBLISHED,
-        #     courses__id__in=ids,
-        # ).prefetch_related('courses')
-        # added_module = False
-        # for m in modules:
-        #     if m.may_enroll() and ('em', m.id) not in objects_ids:
-        #         objects.append({'type': 'em', 'item': m})
-        #         objects_ids.append(('em', m.id))
-        #         added_module = True
-        #         break
-        # if added_module:
-        #     continue
+        modules = EducationalModule.objects.filter(
+            status=PUBLISHED,
+            courses__id__in=ids,
+        ).prefetch_related('courses')
+        added_module = False
+        for m in modules:
+            if m.may_enroll() and ('em', m.id) not in objects_ids:
+                objects.append({'type': 'em', 'item': m})
+                objects_ids.append(('em', m.id))
+                added_module = True
+                break
+        if added_module:
+            continue
         added = [i[1] for i in objects_ids]
         c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_ids:
@@ -265,19 +274,19 @@ def update_frontpage_context(context):
     for c, ids in by_category_dpo.iteritems():
         if len(objects_dpo) > 5:
             break
-        # modules = EducationalModule.objects.filter(
-        #     status=PUBLISHED,
-        #     courses__in=ids,
-        # ).prefetch_related('courses')
-        # added_module = False
-        # for m in modules:
-        #     if m.may_enroll() and ('em', m.id) not in objects_dpo_ids:
-        #         objects_dpo.append({'type': 'em', 'item': m})
-        #         objects_dpo_ids.append(('em', m.id))
-        #         added_module = True
-        #         break
-        # if added_module:
-        #     continue
+        modules = EducationalModule.objects.filter(
+            status=PUBLISHED,
+            courses__in=ids,
+        ).prefetch_related('courses')
+        added_module = False
+        for m in modules:
+            if m.may_enroll() and ('em', m.id) not in objects_dpo_ids:
+                objects_dpo.append({'type': 'em', 'item': m})
+                objects_dpo_ids.append(('em', m.id))
+                added_module = True
+                break
+        if added_module:
+            continue
         added = [i[1] for i in objects_dpo_ids]
         c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_dpo_ids:
@@ -398,7 +407,7 @@ def edmodule_catalog_view(request, category=None):
         courses[c.id] = dic
 
     for m in EducationalModule.objects.filter(status='published', courses__id__in=courses.keys()).\
-            annotate(cnt_courses=Count('courses')):
+            annotate(cnt_courses=Count('courses')).select_related('extended_params'):
         if m.cover:
             cover_name = os.path.split(m.cover.name)[-1]
             if cover_name in all_module_covers:
@@ -407,12 +416,20 @@ def edmodule_catalog_view(request, category=None):
                 if client:
                     client.captureMessage('Image not found: %s' % str(m.cover))
 
+        try:
+            extended = m.extended_params
+        except:
+            extended = None
         dic = {
             'title': m.title,
-            'authors': [i.title for i in m.get_authors()],
+            'authors_and_partners': [{'url': i.link, 'title': i.abbr or i.title} for i in m.get_authors_and_partners()],
             'count_courses': m.cnt_courses,
+            'short_description': extended and extended.short_description,
+            'catalog_marker': extended and extended.catalog_marker,
+            'url': reverse('edmodule-page', kwargs={'code': m.code})
         }
-        dic.update({'course_status_params': m.course_status_params})
+        dic.update({'course_status_params': m.course_status_params()})
+        modules[m.id] = dic
 
     context = {
         'chosen_category': category,

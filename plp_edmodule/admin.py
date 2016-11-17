@@ -7,7 +7,12 @@ from autocomplete_light import modelform_factory
 from statistics.admin import RemoveDeleteActionMixin
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.admin import EducationalModuleExtendedInline
-from .models import EducationalModule, EducationalModuleEnrollment
+from .models import (
+    EducationalModule,
+    EducationalModuleEnrollment,
+    EducationalModuleEnrollmentType,
+    EducationalModuleEnrollmentReason,
+)
 
 
 class EducationalModuleAdminForm(forms.ModelForm):
@@ -39,5 +44,13 @@ class EducationalModuleEnrollmentAdmin(admin.ModelAdmin):
     form = modelform_factory(EducationalModuleEnrollment, exclude=[])
 
 
+class EducationalModuleEnrollmentReasonAdmin(admin.ModelAdmin):
+    search_fields = ('enrollment__user__username', 'enrollment__user__email')
+    list_display = ('enrollment', 'module_enrollment_type', )
+    list_filter = ('enrollment__module__code', )
+
+
 admin.site.register(EducationalModule, EducationalModuleAdmin)
 admin.site.register(EducationalModuleEnrollment, EducationalModuleEnrollmentAdmin)
+admin.site.register(EducationalModuleEnrollmentType)
+admin.site.register(EducationalModuleEnrollmentReason, EducationalModuleEnrollmentReasonAdmin)

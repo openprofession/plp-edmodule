@@ -1,14 +1,16 @@
 # coding: utf-8
 
 import random
+from collections import defaultdict
 from django.conf import settings
 from django.core import validators
 from django.db import models
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from sortedm2m.fields import SortedManyToManyField
-from plp.models import Course, User, SessionEnrollmentType, Participant
+from plp.models import Course, User, SessionEnrollmentType, Participant, CourseSession, EnrollmentReason
 from plp_extension.apps.course_review.models import AbstractRating
 from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
 from plp_extension.apps.module_extension.models import DEFAULT_COVER_SIZE
@@ -187,7 +189,14 @@ class EducationalModule(models.Model):
         data = [i.strip() for i in data if i.strip()]
         return list(set(data))
 
-    def get_price_list(self):
+    def get_requirements(self):
+        try:
+            s = self.extended_params.requirements or ''
+            return [i.strip() for i in s.splitlines() if i.strip()]
+        except:
+            pass
+
+    def get_price_list(self, for_user=None):
         """
         :return: {
             'courses': [(курс(Course), цена(int), ...],
@@ -196,20 +205,39 @@ class EducationalModule(models.Model):
             'discount': скидка (int)
         }
         """
+        courses = self.courses.all()
+        # берем цену ближайшей сессии, на которую можно записаться, или предыдущей
+        session_for_course = {}
+        now = timezone.now()
+        exclude = {}
+        if for_user and for_user.is_authenticated():
+            # если пользователь платил за какую-то сессию курса, цена курса для него 0
+            exclude['id__in'] = list(EnrollmentReason.objects.filter(
+                participant__user=for_user,
+                session_enrollment_type__mode='verified'
+            ).values_list('participant__session__course__id', flat=True))
+        sessions = CourseSession.objects.filter(
+            course__in=courses.exclude(**exclude),
+            datetime_end_enroll__isnull=False,
+            datetime_start_enroll__lt=now
+        ).exclude(**exclude).order_by('-datetime_end_enroll')
+        courses_with_sessions = defaultdict(list)
+        for s in sessions:
+            courses_with_sessions[s.course_id].append(s)
+        for c, course_sessions in courses_with_sessions.iteritems():
+            if course_sessions:
+                session_for_course[c] = course_sessions[0]
         types = dict([(i.session.id, i.price) for i in
-                      SessionEnrollmentType.objects.filter(session__course__in=self.courses.all(), mode='verified')])
+                      SessionEnrollmentType.objects.filter(session__in=session_for_course.values(), mode='verified')])
         result = {'courses': []}
-        for c in self.courses.all():
-            s = c.next_session
+        for c in courses:
+            s = session_for_course.get(c.id)
             if s:
-                result['courses'].append((c, types.get(s.id)))
+                result['courses'].append((c, types.get(s.id, 0)))
             else:
-                result['courses'].append((c, None))
-        try:
-            price = sum([i[0] for i in result['courses']])
-            whole_price = price * (1 - self.discount / 100.)
-        except TypeError:
-            price, whole_price = None, None
+                result['courses'].append((c, 0))
+        price = sum([i[1] for i in result['courses']])
+        whole_price = price * (1 - self.discount / 100.)
         result.update({
             'price': price,
             'whole_price': whole_price,
@@ -240,11 +268,10 @@ class EducationalModule(models.Model):
         return [(c, choose_closest_session(c)) for c in courses]
 
     def get_closest_course_with_session(self):
-        courses = self.courses_with_closest_sessions
-        courses = filter(lambda x: x[1] and x[1].datetime_starts, courses)
-        courses = sorted(courses, key=lambda x: x[1].datetime_starts)
-        if courses:
-            return courses[0]
+        for c in self.courses.filter(extended_params__is_project=False):
+            session = c.next_session
+            if session and session.get_verified_mode_enrollment_type():
+                return c, session
 
     def may_enroll(self):
         courses = self.courses_with_closest_sessions
@@ -264,6 +291,22 @@ class EducationalModule(models.Model):
                 passed[course_id] = True
         return all(i for i in passed.values())
 
+    def get_available_enrollment_types(self, mode=None, exclude_expired=True, active=True):
+        """ Возвращает доступные варианты EducationalModuleEnrollmentType для текущего модуля """
+        qs = EducationalModuleEnrollmentType.objects.filter(module=self)
+        if active:
+            qs = qs.filter(active=True)
+        if mode:
+            qs = qs.filter(mode=mode)
+        if exclude_expired and mode == 'verified':
+            qs = qs.exclude(buy_expiration__lt=timezone.now()).filter(
+                models.Q(buy_start__isnull=True) | models.Q(buy_start__lt=timezone.now())
+            )
+        return qs
+
+    def get_verified_mode_enrollment_type(self):
+        return self.get_available_enrollment_types(mode='verified').first()
+
 
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
@@ -278,6 +321,9 @@ class EducationalModuleEnrollment(models.Model):
         verbose_name = _(u'Запись на модуль')
         verbose_name_plural = _(u'Записи на модуль')
         unique_together = ('user', 'module')
+
+    def __unicode__(self):
+        return u'%s - %s' % (self.user, self.module)
 
 
 class EducationalModuleProgress(models.Model):
@@ -328,6 +374,9 @@ class EducationalModuleEnrollmentType(models.Model):
         verbose_name_plural = _(u'Варианты прохождения модуля')
         unique_together = (("module", "mode"),)
 
+    def __unicode__(self):
+        return u'%s - %s - %s' % (self.module, self.mode, self.price)
+
 
 class EducationalModuleEnrollmentReason(models.Model):
     class PAYMENT_TYPE:
@@ -348,6 +397,7 @@ class EducationalModuleEnrollmentReason(models.Model):
                                         verbose_name=_(u'Номер договора'))
     payment_descriptions = models.TextField(null=True, blank=True, help_text=_(u'Комментарий к платежу'),
                                             verbose_name=_(u'Описание платежа'))
+    full_paid = models.BooleanField(verbose_name=_(u'Специализация оплачена полностью'), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
