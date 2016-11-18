@@ -21,7 +21,7 @@ from plp.models import HonorCode, CourseSession, Course, Participant, Enrollment
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
-from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN
+from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason
 from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict, \
     count_user_score, update_modules_graduation
 from .signals import edmodule_enrolled
@@ -150,6 +150,15 @@ def get_honor_text(request):
 def update_context_with_modules(context, user):
     if user.is_authenticated():
         modules = EducationalModule.objects.filter(educationalmoduleenrollment__user=user).distinct().order_by('title')
+        enrollment_reasons = EducationalModuleEnrollmentReason.objects.filter(enrollment__user=user).\
+            order_by('-full_paid').select_related('enrollment__module__id')
+        reason_for_module = {}
+        for e in enrollment_reasons:
+            if e.enrollment.module.id in reason_for_module:
+                continue
+            reason_for_module[e.enrollment.module.id] = e
+        for m in modules:
+            m.enrollment_reason = reason_for_module.get(m.id)
     else:
         modules = EducationalModule.objects.none()
     context['modules'] = modules
