@@ -209,13 +209,29 @@ class EducationalModule(models.Model):
         # берем цену ближайшей сессии, на которую можно записаться, или предыдущей
         session_for_course = {}
         now = timezone.now()
-        exclude = {}
+        course_paid = []
         if for_user and for_user.is_authenticated():
-            # если пользователь платил за какую-то сессию курса, цена курса для него 0
-            exclude['id__in'] = list(EnrollmentReason.objects.filter(
+            # если пользователь платил за какую-то сессию курса и успешно ее окончил или она
+            # еще не завершилась, цена курса для него 0
+            reasons = EnrollmentReason.objects.filter(
                 participant__user=for_user,
                 session_enrollment_type__mode='verified'
-            ).values_list('participant__session__course__id', flat=True))
+            ).select_related('participant', 'participant__session')
+            payment_for_course = defaultdict(list)
+            for r in reasons:
+                payment_for_course[r.participant.session.course_id].append(r)
+            for course_id, payments in payment_for_course.iteritems():
+                should_pay = True
+                for r in payments:
+                    if r.participant.is_graduate:
+                        should_pay = False
+                        break
+                    if r.participant.session.datetime_ends and r.participant.session.datetime_ends < now:
+                        should_pay = False
+                        break
+                if not should_pay:
+                    course_paid.append(course_id)
+        exclude = {'id__in': course_paid}
         sessions = CourseSession.objects.filter(
             course__in=courses.exclude(**exclude),
             datetime_end_enroll__isnull=False,
