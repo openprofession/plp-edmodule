@@ -435,6 +435,12 @@ def edmodule_catalog_view(request, category=None):
     except OSError:
         all_module_covers = None
 
+    through_model = CourseExtendedParameters._meta.get_field('categories').rel.through
+    category_for_course = defaultdict(list)
+    q = through_model.objects.values_list('courseextendedparameters__course__id', 'category__id')
+    for course, category in q:
+        category_for_course[course].append(category)
+
     courses_query = Course.objects.filter(status='published').prefetch_related(
         'extended_params', 'extended_params__authors', 'course_sessions').distinct()
     # if not category:
@@ -463,6 +469,7 @@ def edmodule_catalog_view(request, category=None):
             'authors_and_partners': [{'url': i.link, 'title': i.abbr or i.title} for i in c.get_authors_and_partners()],
             'catalog_marker': getattr(c, 'catalog_marker', ''),
             'short_description': getattr(c, 'short_description', '') or Truncator(default_desc).chars(max_length),
+            'categories': category_for_course.get(c.id, []),
         })
         session = _choose_closest_session(c)
         dic.update({'course_status_params': get_status_dict(session)})
@@ -482,12 +489,15 @@ def edmodule_catalog_view(request, category=None):
             extended = m.extended_params
         except:
             extended = None
+        categories = reduce(lambda x, y: x + y, [category_for_course.get(i.id, []) for i in m.courses.all()], [])
+        categories = list(set(categories))
         dic = {
             'title': m.title,
             'authors_and_partners': [{'url': i.link, 'title': i.abbr or i.title} for i in m.get_authors_and_partners()],
             'count_courses': m.cnt_courses,
             'short_description': extended and extended.short_description,
             'catalog_marker': extended and extended.catalog_marker,
+            'categories': categories,
             'url': reverse('edmodule-page', kwargs={'code': m.code})
         }
         dic.update({'course_status_params': m.course_status_params()})
