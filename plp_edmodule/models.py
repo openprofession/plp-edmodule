@@ -326,6 +326,13 @@ class EducationalModule(models.Model):
     def get_verified_mode_enrollment_type(self):
         return self.get_available_enrollment_types(mode='verified').first()
 
+    def get_enrollment_reason_for_user(self, user):
+        if user.is_authenticated():
+            return EducationalModuleEnrollmentReason.objects.filter(
+                enrollment__user=user,
+                enrollment__module=self,
+            ).order_by('-full_paid').first()
+
 
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))

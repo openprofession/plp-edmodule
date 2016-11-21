@@ -130,6 +130,7 @@ def module_page(request, code):
         'instructors': module.instructors,
         'authenticated': request.user.is_authenticated(),
         'upsale_links': upsale_links,
+        'enrollment_reason': module.get_enrollment_reason_for_user(request.user),
     })
 
 
