@@ -112,6 +112,10 @@ def module_page(request, code):
             content_type=ContentType.objects.get_for_model(module),
             is_active=True,
         ).select_related('upsale')
+    try:
+        session, price = module.get_first_session_to_buy(request.user)
+    except TypeError:
+        session, price = None, None
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
         'courses': [course_set_attrs(i) for i in module.courses.all()],
@@ -131,6 +135,8 @@ def module_page(request, code):
         'authenticated': request.user.is_authenticated(),
         'upsale_links': upsale_links,
         'enrollment_reason': module.get_enrollment_reason_for_user(request.user),
+        'first_session': session,
+        'first_session_price': price,
     })
 
 
@@ -528,7 +534,9 @@ def enroll_on_course(session, request):
         except EDXEnrollmentError:
             return JsonResponse({'status': 0, 'error': 'edx error'})
 
-    enrs = EducationalModuleEnrollment.objects.filter(user=request.user, module__courses=session.course)
+    enrs = EducationalModuleEnrollment.objects.filter(user=request.user,
+                                                      module__courses=session.course,
+                                                      enrollment_reason__full_paid=True)
     verified = False
     # в предложении что тип записи на модуль всегда verified
     if enrs:

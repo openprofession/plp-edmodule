@@ -333,6 +333,22 @@ class EducationalModule(models.Model):
                 enrollment__module=self,
             ).order_by('-full_paid').first()
 
+    def get_first_session_to_buy(self, user):
+        """
+        Сессия первого курса, который пользователь может купить.
+        Возвращает (сессия, цена) или None
+        """
+        auth = user.is_authenticated()
+        for course in self.courses.exclude(extended_params__is_project=True):
+            session = course.next_session
+            if session:
+                enr_type = session.get_verified_mode_enrollment_type()
+                if enr_type and auth:
+                    if not enr_type.is_user_enrolled(user):
+                        return session, enr_type.price
+                elif enr_type:
+                    return session, enr_type.price
+
 
 class EducationalModuleEnrollment(models.Model):
     user = models.ForeignKey(User, verbose_name=_(u'Пользователь'))
