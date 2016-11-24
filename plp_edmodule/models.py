@@ -266,7 +266,7 @@ class EducationalModule(models.Model):
 
     def get_start_date(self):
         c = self.courses.first()
-        if c.next_session:
+        if c and c.next_session:
             return c.next_session.datetime_starts
 
     def course_status_params(self):
