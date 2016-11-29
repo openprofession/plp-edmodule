@@ -32,3 +32,12 @@ def enroll_button(context, course, session=None):
         'request': context['request'],
         'course': course_set_attrs(course),
     }
+
+
+@register.filter
+def split_text(value, splitter=None):
+    if not value:
+        return []
+    if splitter is None:
+        return [i.strip() for i in value.splitlines() if i.strip()]
+    return [i.strip() for i in value.split(splitter) if i.strip()]
