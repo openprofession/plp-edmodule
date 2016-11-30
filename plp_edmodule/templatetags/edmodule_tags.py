@@ -1,10 +1,19 @@
 # coding: utf-8
 
 from django import template
-from plp.models import Participant
+from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from plp.models import Participant, EnrollmentReason, CourseSession
+from plp.utils.rudate import STARTED, ENDED
+from ..models import EducationalModuleEnrollmentReason
 from ..utils import course_set_attrs
 
 register = template.Library()
+
+try:
+    course_session_content_type = ContentType.objects.get_for_model(CourseSession)
+except RuntimeError:
+    pass
 
 
 @register.inclusion_tag('course/_enroll_button.html', takes_context=True)
@@ -20,6 +29,34 @@ def enroll_button(context, course, session=None):
         if p:
             enrolled = True
             honor_accepted = p[0].honor_code_accepted
+    if authenticated:
+        enr_reason = EnrollmentReason.objects.filter(
+            participant__user__id=user.id,
+            participant__session__id=session.id,
+            session_enrollment_type__mode='verified'
+        )
+        module_payment = EducationalModuleEnrollmentReason.objects.filter(
+            enrollment__module__courses__id=session.course_id,
+            enrollment__user__id=user.id,
+            full_paid=True
+        )
+        has_paid = enr_reason.exists() or module_payment.exists()
+    else:
+        has_paid = False
+    if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
+        from opro_payments.models import UpsaleLink, ObjectEnrollment
+        if not hasattr(session, 'upsales'):
+            session.upsales = UpsaleLink.objects.filter(
+                content_type=course_session_content_type,
+                object_id=session.id,
+                is_active=True
+            )
+        if not hasattr(session, 'bought_upsales') and authenticated:
+            session.bought_upsales = ObjectEnrollment.objects.filter(
+                user__id=user.id,
+                upsale__in=session.upsales,
+                is_active=True
+            ).select_related('upsale')
     return {
         'status': status,
         'session': session,
@@ -31,6 +68,8 @@ def enroll_button(context, course, session=None):
         'title': course.title,
         'request': context['request'],
         'course': course_set_attrs(course),
+        'has_paid': has_paid,
+        'materials_available': session.course_status()['code'] in [STARTED, ENDED] and session.access_allowed()
     }
 
 
