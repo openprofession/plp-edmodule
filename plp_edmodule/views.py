@@ -161,6 +161,21 @@ def update_context_with_modules(context, user):
     покупки сессий и доступности платных/бесплатных вариантов прохождения, добавление апсейлов
     и информации об их покупке для всех сессий в контексте
     """
+    def _remove_duplicates(s, lists):
+        for item in lists:
+            try:
+                item.remove(s)
+            except ValueError:
+                pass
+
+    def _assign_module_tab(module, session, course):
+        if session in current:
+            module.courses_current.append(course)
+        if session in finished:
+            module.courses_finished.append(course)
+        if session in future:
+            module.courses_feature.append(course)
+
     if user.is_authenticated():
         modules = EducationalModule.objects.filter(educationalmoduleenrollment__user=user).distinct().order_by('title')
         enrollment_reasons = EducationalModuleEnrollmentReason.objects.filter(enrollment__user=user).\
@@ -197,9 +212,11 @@ def update_context_with_modules(context, user):
         i.upsales = upsales_for_session.get(i.id)
         i.bought_upsales = obj_enrollments_for_session.get(i.id)
     sessions_for_course = defaultdict(list)
+    available_sessions_for_course = defaultdict(list)
     for cs in CourseSession.objects.filter(id__in=modules_courses_ids).order_by('datetime_starts'):
+        sessions_for_course[cs.course_id].append(cs)
         if cs.allow_enrollments():
-            sessions_for_course[cs.course_id].append(cs)
+            available_sessions_for_course[cs.course_id].append(cs)
     participant_for_session = {i.session_id: i for i in
                                Participant.objects.filter(user=user, session__id__in=modules_courses_ids)}
     paid_enrollment_for_session = {i.participant.session.id: i for i in
@@ -210,11 +227,19 @@ def update_context_with_modules(context, user):
                               SessionEnrollmentType.objects.filter(session__id__in=modules_courses_ids, mode__in=['honor'])}
     verified_mode_for_session = {i.session_id: i for i in
                               SessionEnrollmentType.objects.filter(session__id__in=modules_courses_ids, mode__in=['verified'])}
+    without_duplicates = {
+        'courses_current': current[:],
+        'courses_finished': finished[:],
+        'courses_feature': future[:]
+    }
     for module in context['modules']:
         module.all_courses = module.courses.all()
-        for course in module.all_courses:
-            course.available_sessions = sessions_for_course[course.id]
-            for session in course.available_sessions:
+        for attr in ['courses_current', 'courses_finished', 'courses_feature']:
+            setattr(module, attr, [])
+        for index, course in enumerate(module.all_courses, 1):
+            course.available_sessions = available_sessions_for_course[course.id]
+            course.index = index
+            for session in sessions_for_course[course.id]:
                 session.participant = participant_for_session.get(session.id)
                 session.paid_enrollment = paid_enrollment_for_session.get(session.id)
                 session.verified_mode_enrollment_type = verified_mode_for_session.get(session.id)
@@ -225,7 +250,11 @@ def update_context_with_modules(context, user):
                     session.has_honor_mode = True
                 session.upsales = upsales_for_session.get(session.id)
                 session.bought_upsales = obj_enrollments_for_session.get(session.id)
-    context['courses_all'] = current + future + finished
+                if session.participant:
+                    _assign_module_tab(module, session, course)
+                    _remove_duplicates(session, without_duplicates.values())
+    context.update(without_duplicates)
+    context['courses_all'] = reduce(lambda x, y: x + y, without_duplicates.values(), [])
     update_modules_graduation(user, context['courses_finished'])
     context['score'] = count_user_score(user)
     context['count_certificates'] = Participant.objects.filter(user=user, is_graduate=True).count()
