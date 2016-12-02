@@ -3,6 +3,8 @@
 import random
 from collections import defaultdict
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core import validators
 from django.db import models
 from django.utils import timezone
@@ -10,6 +12,8 @@ from django.utils.functional import cached_property
 from django.utils.translation import ugettext_lazy as _
 from jsonfield import JSONField
 from sortedm2m.fields import SortedManyToManyField
+from imagekit.models import ImageSpecField
+from imagekit.processors import Resize
 from plp.models import Course, User, SessionEnrollmentType, Participant, CourseSession, EnrollmentReason
 from plp_extension.apps.course_review.models import AbstractRating
 from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
@@ -20,6 +24,11 @@ from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_paye
 
 HIDDEN = 'hidden'
 PUBLISHED = 'published'
+
+ICON_THUMB_SIZE = (
+    getattr(settings, 'BENEFIT_ICON_SIZE', (100, 100))[0],
+    getattr(settings, 'BENEFIT_ICON_SIZE', (100, 100))[1]
+)
 
 
 class EducationalModule(models.Model):
@@ -446,6 +455,32 @@ class EducationalModuleEnrollmentReason(models.Model):
     class Meta:
         verbose_name = _(u'Причина записи')
         verbose_name_plural = _(u'Причины записи')
+
+
+class Benefit(models.Model):
+    title = models.CharField(max_length=160, verbose_name=_(u'Название'))
+    description = models.TextField(verbose_name=_(u'Описание'), blank=True, default='',
+                                   validators=[validators.MaxLengthValidator(400)])
+    icon = models.ImageField(verbose_name=_(u'Иконка'), upload_to='benefit_icons',
+                             help_text=_(u'png, размер файла не более 1 мб, разрешение не более 1000*1000'))
+    icon_thumbnail = ImageSpecField(source='icon', processors=[Resize(*ICON_THUMB_SIZE)])
+
+    class Meta:
+        verbose_name = _(u'Выгода')
+        verbose_name_plural = _(u'Выгоды')
+
+    def __unicode__(self):
+        return self.title
+
+
+class BenefitLink(models.Model):
+    limit_models = models.Q(app_label='plp_edmodule', model='educationalmodule')
+
+    benefit = models.ForeignKey('Benefit', verbose_name=_(u'Выгода'), related_name='benefit_links')
+    content_type = models.ForeignKey(ContentType, limit_choices_to=limit_models,
+                                     verbose_name=_(u'Тип объекта, к которому выгода'))
+    object_id = models.PositiveIntegerField(verbose_name=_(u'Объект, к которому выгода'))
+    content_object = GenericForeignKey('content_type', 'object_id')
 
 
 edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
