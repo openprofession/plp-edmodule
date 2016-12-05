@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.utils.translation import ugettext as _
 from raven import Client
 from plp.utils.edx_enrollment import EDXEnrollment, EDXNotAvailable, EDXCommunicationError, EDXEnrollmentError
+from plp.utils.rudate import STARTED, SCHEDULED
 from plp.models import CourseSession, Participant
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.models import EducationalModuleExtendedParameters
@@ -104,7 +105,7 @@ def update_module_enrollment_progress(enrollment):
     """
     module = enrollment.module
     sessions = CourseSession.objects.filter(course__in=module.courses.all())
-    course_ids = [s.get_absolute_slug_v1() for s in sessions if s.course_status().get('code') == 'started']
+    course_ids = [s.get_absolute_slug_v1() for s in sessions if s.course_status().get('code') == STARTED]
     try:
         data = EDXEnrollmentExtension().get_courses_progress(enrollment.user.username, course_ids).json()
         now = timezone.now().strftime('%H:%M:%S %Y-%m-%d')
@@ -151,13 +152,13 @@ def get_status_dict(session):
     if session:
         status = session.course_status()
         d = {'status': status['code']}
-        if status['code'] == 'scheduled':
+        if status['code'] == SCHEDULED:
             starts = timezone.localtime(session.datetime_starts).date()
             d['days_before_start'] = (starts - timezone.now().date()).days
             d['date'] = session.datetime_starts.strftime('%d.%m.%Y')
             day, month = starts.day, months.get(starts.month)
             d['date_words'] = _(u'начало {day} {month}').format(day=day, month=month)
-        elif status['code'] == 'started':
+        elif status['code'] == STARTED:
             ends = timezone.localtime(session.datetime_end_enroll)
             d['date'] = ends.strftime('%d.%m.%Y')
             day, month = ends.day, months.get(ends.month)
