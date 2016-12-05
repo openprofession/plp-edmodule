@@ -241,6 +241,7 @@ def update_context_with_modules(context, user):
         for index, course in enumerate(module.all_courses, 1):
             course.available_sessions = available_sessions_for_course[course.id]
             course.index = index
+            course.has_module = True
             for session in sessions_for_course[course.id]:
                 session.participant = participant_for_session.get(session.id)
                 session.paid_enrollment = paid_enrollment_for_session.get(session.id)
