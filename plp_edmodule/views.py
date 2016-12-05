@@ -22,7 +22,8 @@ from plp.models import HonorCode, CourseSession, Course, Participant, Enrollment
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
-from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason
+from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason, \
+    BenefitLink
 from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict, \
     count_user_score, update_modules_graduation
 from .signals import edmodule_enrolled
@@ -137,6 +138,7 @@ def module_page(request, code):
         'enrollment_reason': module.get_enrollment_reason_for_user(request.user),
         'first_session': session,
         'first_session_price': price,
+        'benefit_links': BenefitLink.get_benefits_for_object(module),
     })
 
 
