@@ -482,6 +482,14 @@ class BenefitLink(models.Model):
     object_id = models.PositiveIntegerField(verbose_name=_(u'Объект, к которому выгода'))
     content_object = GenericForeignKey('content_type', 'object_id')
 
+    @staticmethod
+    def get_benefits_for_object(obj):
+        ctype = ContentType.objects.get_for_model(obj)
+        return BenefitLink.objects.filter(
+            content_type=ctype,
+            object_id=obj.id
+        ).select_related('benefit')
+
 
 edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
 edmodule_unenrolled.connect(edmodule_unenrolled_handler, sender=EducationalModuleEnrollment)
