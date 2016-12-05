@@ -260,6 +260,11 @@ def update_context_with_modules(context, user):
     update_modules_graduation(user, context['courses_finished'])
     context['score'] = count_user_score(user)
     context['count_certificates'] = Participant.objects.filter(user=user, is_graduate=True).count()
+    counters = {}
+    for attr in ['courses_all', 'courses_current', 'courses_finished', 'courses_feature']:
+        counters[attr] = len(context[attr])
+        counters[attr] += sum([len(m.all_courses if attr == 'courses_all' else getattr(m, attr)) for m in modules])
+    context['counters'] = counters
 
 
 def update_course_details_context(context, user):
