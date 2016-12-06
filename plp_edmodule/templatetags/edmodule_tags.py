@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from plp.models import Participant, EnrollmentReason, CourseSession
 from plp.utils.rudate import STARTED, ENDED
-from ..models import EducationalModuleEnrollmentReason
+from ..models import EducationalModuleEnrollmentReason, EducationalModuleEnrollment
 from ..utils import course_set_attrs
 
 register = template.Library()
@@ -41,8 +41,12 @@ def enroll_button(context, course, session=None):
             full_paid=True
         )
         has_paid = enr_reason.exists() or module_payment.exists()
+        if not hasattr(course, 'has_module'):
+            has_module = EducationalModuleEnrollment.objects.filter(
+                user=user, is_active=True, module__courses__id=course.id).exists()
     else:
         has_paid = False
+        has_module = False
     if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
         from opro_payments.models import UpsaleLink, ObjectEnrollment
         if not hasattr(session, 'upsales'):
@@ -69,6 +73,7 @@ def enroll_button(context, course, session=None):
         'request': context['request'],
         'course': course_set_attrs(course),
         'has_paid': has_paid,
+        'has_module': has_module,
         'materials_available': session.course_status()['code'] in [STARTED, ENDED] and session.access_allowed()
     }
 
