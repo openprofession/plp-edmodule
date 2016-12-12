@@ -64,6 +64,13 @@ def edmodule_payed_handler(**kwargs):
             mail_from=settings.EMAIL_NOTIFICATIONS_FROM,
             mail_to=(user.get_full_name(), user.email)
         )
-        context = {'module': module, 'user': user, 'site_url': get_domain_url()}
+        context = {
+            'module': module,
+            'user': user,
+            'site_url': get_domain_url(),
+            'promocodes': kwargs.get('promocodes', []),
+            'upsale_links': kwargs.get('upsale_links', []),
+            'shop_url': getattr(settings, 'OPRO_PAYMENT_SHOP_URL', None),
+        }
         context.update(get_prefix_and_site())
         msg.send(context={'context': context})
