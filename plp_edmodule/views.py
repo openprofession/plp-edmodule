@@ -172,11 +172,11 @@ def update_context_with_modules(context, user):
 
     def _assign_module_tab(module, session, course):
         if session in current:
-            module.courses_current.append(course)
+            module.courses_current.append((course, session))
         if session in finished:
-            module.courses_finished.append(course)
+            module.courses_finished.append((course, session))
         if session in future:
-            module.courses_feature.append(course)
+            module.courses_feature.append((course, session))
 
     if user.is_authenticated():
         modules = EducationalModule.objects.filter(educationalmoduleenrollment__user=user).distinct().order_by('title')
@@ -234,11 +234,13 @@ def update_context_with_modules(context, user):
         'courses_finished': finished[:],
         'courses_feature': future[:]
     }
+    update_modules_graduation(user, context['courses_finished'])
     for module in context['modules']:
-        module.all_courses = module.courses.all()
+        all_courses = module.courses.all()
+        module.all_courses = zip(all_courses, [c.next_session for c in all_courses])
         for attr in ['courses_current', 'courses_finished', 'courses_feature']:
             setattr(module, attr, [])
-        for index, course in enumerate(module.all_courses, 1):
+        for index, (course, __) in enumerate(module.all_courses, 1):
             course.available_sessions = available_sessions_for_course[course.id]
             course.index = index
             course.has_module = True
@@ -258,9 +260,9 @@ def update_context_with_modules(context, user):
                     _remove_duplicates(session, without_duplicates.values())
     context.update(without_duplicates)
     context['courses_all'] = reduce(lambda x, y: x + y, without_duplicates.values(), [])
-    update_modules_graduation(user, context['courses_finished'])
     context['score'] = count_user_score(user)
     context['count_certificates'] = Participant.objects.filter(user=user, is_graduate=True).count()
+    context['count_participant'] = Participant.objects.filter(user=user).count()
     counters = {}
     for attr in ['courses_all', 'courses_current', 'courses_finished', 'courses_feature']:
         counters[attr] = len(context[attr])
