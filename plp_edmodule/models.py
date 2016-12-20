@@ -239,7 +239,7 @@ class EducationalModule(models.Model):
                     if r.participant.is_graduate:
                         should_pay = False
                         break
-                    if r.participant.session.datetime_ends and r.participant.session.datetime_ends < now:
+                    if r.participant.session.datetime_ends and r.participant.session.datetime_ends > now:
                         should_pay = False
                         break
                 if not should_pay:
