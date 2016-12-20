@@ -23,13 +23,12 @@ def enroll_button(context, course, session=None):
     if not session:
         session = course.next_session
     status = session.button_status(user) if session else course.button_status(user)
-    honor_accepted, enrolled = False, False
+    honor_accepted, enrolled, has_module = False, False, False
     if session and authenticated:
         p = Participant.objects.filter(session=session, user=user)
         if p:
             enrolled = True
             honor_accepted = p[0].honor_code_accepted
-    if authenticated:
         enr_reason = EnrollmentReason.objects.filter(
             participant__user__id=user.id,
             participant__session__id=session.id,
@@ -47,7 +46,7 @@ def enroll_button(context, course, session=None):
     else:
         has_paid = False
         has_module = False
-    if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
+    if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False) and session:
         from opro_payments.models import UpsaleLink, ObjectEnrollment
         if not hasattr(session, 'upsales'):
             session.upsales = UpsaleLink.objects.filter(
@@ -61,6 +60,10 @@ def enroll_button(context, course, session=None):
                 upsale__in=session.upsales,
                 is_active=True
             ).select_related('upsale')
+    if session:
+        materials_available = session.course_status()['code'] in [STARTED, ENDED] and session.access_allowed()
+    else:
+        materials_available = False
     return {
         'status': status,
         'session': session,
@@ -74,7 +77,7 @@ def enroll_button(context, course, session=None):
         'course': course_set_attrs(course),
         'has_paid': has_paid,
         'has_module': has_module,
-        'materials_available': session.course_status()['code'] in [STARTED, ENDED] and session.access_allowed()
+        'materials_available': materials_available,
     }
 
 
