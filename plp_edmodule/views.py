@@ -189,6 +189,9 @@ def update_context_with_modules(context, user):
             reason_for_module[e.enrollment.module.id] = e
         for m in modules:
             m.enrollment_reason = reason_for_module.get(m.id)
+            price_data = m.get_price_list(user)
+            price_data.pop('courses', None)
+            m.price_data = json.dumps(price_data)
     else:
         modules = EducationalModule.objects.none()
     context['modules'] = modules
@@ -196,7 +199,9 @@ def update_context_with_modules(context, user):
     finished = context['courses_finished']
     future = context['courses_feature']
     upsales_for_session = defaultdict(list)
+    upsales_for_module = defaultdict(list)
     obj_enrollments_for_session = defaultdict(list)
+    obj_enrollments_for_module = defaultdict(list)
     modules_courses_ids = list(modules.values_list('courses__course_sessions__id', flat=True))
     modules_courses_ids = filter(lambda x: x, modules_courses_ids)
     if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
@@ -204,12 +209,20 @@ def update_context_with_modules(context, user):
         course_ids = [i.id for i in (finished + future + current)]
         course_ids = list(set(course_ids).union(set(modules_courses_ids)))
         ctype = ContentType.objects.get_for_model(CourseSession)
+        ctype_module = ContentType.objects.get_for_model(EducationalModule)
         upsale_links = UpsaleLink.objects.filter(content_type=ctype, object_id__in=course_ids, is_active=True)
+        module_upsale_links = UpsaleLink.objects.filter(content_type=ctype_module,
+                                                        object_id__in=[i.id for i in modules], is_active=True)
         for i in upsale_links:
             upsales_for_session[i.object_id].append(i)
+        for i in module_upsale_links:
+            upsales_for_module[i.object_id].append(i)
         obj_enrollments = ObjectEnrollment.objects.filter(upsale__in=upsale_links, user=user).select_related('upsale')
+        module_obj_enrollments = ObjectEnrollment.objects.filter(upsale__in=module_upsale_links, user=user).select_related('upsale')
         for i in obj_enrollments:
-            obj_enrollments_for_session[i.upsale.object_id].append(i)
+            obj_enrollments_for_session[i.upsale.object_id].append(i.upsale)
+        for i in module_obj_enrollments:
+            obj_enrollments_for_module[i.upsale.object_id].append(i.upsale)
     for i in (current + future + finished):
         i.upsales = upsales_for_session.get(i.id)
         i.bought_upsales = obj_enrollments_for_session.get(i.id)
@@ -238,6 +251,8 @@ def update_context_with_modules(context, user):
     for module in context['modules']:
         all_courses = module.courses.all()
         module.all_courses = zip(all_courses, [c.next_session for c in all_courses])
+        module.upsales = upsales_for_module.get(module.id, [])
+        module.bought_upsales = obj_enrollments_for_module.get(module.id, [])
         for attr in ['courses_current', 'courses_finished', 'courses_feature']:
             setattr(module, attr, [])
         for index, (course, __) in enumerate(module.all_courses, 1):
