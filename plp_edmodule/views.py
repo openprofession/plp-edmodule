@@ -23,7 +23,7 @@ from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason, \
-    BenefitLink
+    BenefitLink, CoursePromotion
 from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict, \
     count_user_score, update_modules_graduation
 from .signals import edmodule_enrolled
@@ -333,7 +333,28 @@ def update_course_details_context(context, user):
         pass
 
 
+def get_promoted_courses(limit=None):
+    qs = CoursePromotion.objects.all()
+    items = []
+    for item in qs:
+        if limit is not None and len(items) == limit:
+            break
+        obj = item.content_object
+        if obj:
+            item_type = 'em' if isinstance(obj, EducationalModule) else 'course'
+            items.append({'type': item_type, 'item': obj})
+    return items
+
+
 def update_frontpage_context(context):
+    CNT_COURSES = 5
+    objects = get_promoted_courses(CNT_COURSES)
+    objects_ids = []
+    for item in objects:
+        objects_ids.append((
+            item['type'],
+            item['item'].id
+        ))
     now = timezone.now()
     course_ids = CourseSession.objects.filter(
         course__status=PUBLISHED,
@@ -347,8 +368,6 @@ def update_frontpage_context(context):
         by_category_dpo[c.id] = list(CourseExtendedParameters.objects.filter(
             categories=c, is_dpo=True, course__id__in=course_ids).values_list('course__id', flat=True))
 
-    objects, objects_ids = [], []
-    CNT_COURSES = 5
     for c, ids in by_category.iteritems():
         if len(objects) >= CNT_COURSES:
             break
@@ -365,7 +384,7 @@ def update_frontpage_context(context):
                 break
         if added_module:
             continue
-        added = [i[1] for i in objects_ids]
+        added = [i[1] for i in objects_ids if i[0] == 'course']
         c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_ids:
             objects.append({'type': 'course', 'item': course_set_attrs(c)})
@@ -380,7 +399,7 @@ def update_frontpage_context(context):
 
     objects_dpo, objects_dpo_ids = [], []
     for c, ids in by_category_dpo.iteritems():
-        if len(objects_dpo) > 5:
+        if len(objects_dpo) > CNT_COURSES:
             break
         modules = EducationalModule.objects.filter(
             status=PUBLISHED,
@@ -395,7 +414,7 @@ def update_frontpage_context(context):
                 break
         if added_module:
             continue
-        added = [i[1] for i in objects_dpo_ids]
+        added = [i[1] for i in objects_dpo_ids if i[0] == 'course']
         c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_dpo_ids:
             objects_dpo.append({'type': 'course', 'item': course_set_attrs(c)})
