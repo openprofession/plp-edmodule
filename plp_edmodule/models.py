@@ -491,6 +491,25 @@ class BenefitLink(models.Model):
         ).select_related('benefit')
 
 
+class CoursePromotion(models.Model):
+    limit_models = models.Q(app_label='plp_edmodule', model='educationalmodule') | \
+                   models.Q(app_label='plp', model='course')
+    content_type = models.ForeignKey(ContentType, limit_choices_to=limit_models,
+                                     verbose_name=_(u'Тип объекта'))
+    object_id = models.PositiveIntegerField(verbose_name=_(u'Id объекта'))
+    content_object = GenericForeignKey('content_type', 'object_id')
+    content_object.short_description = _(u'Объект')
+    sort = models.SmallIntegerField(verbose_name=_(u'Приоритет'), unique=True)
+
+    class Meta:
+        verbose_name = _(u'Порядок курсов и специализаций на главной')
+        verbose_name_plural = _(u'Порядок курсов и специализаций на главной')
+        ordering = ['sort']
+
+    def __unicode__(self):
+        return u'%s - %s' % (self.sort, self.content_object)
+
+
 edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
 edmodule_unenrolled.connect(edmodule_unenrolled_handler, sender=EducationalModuleEnrollment)
 edmodule_payed.connect(edmodule_payed_handler, sender=EducationalModuleEnrollmentReason)

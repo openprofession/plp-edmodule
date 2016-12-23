@@ -21,6 +21,7 @@ from .models import (
     EducationalModuleEnrollmentReason,
     Benefit,
     BenefitLink,
+    CoursePromotion,
 )
 
 
@@ -124,8 +125,13 @@ class BenefitAdmin(admin.ModelAdmin):
     delete_selected.short_description = delete_selected_original.short_description
 
 
+class CoursePromotionAdmin(admin.ModelAdmin):
+    list_display = ('sort', 'content_type', 'object_id', 'content_object')
+
+
 admin.site.register(EducationalModule, EducationalModuleAdmin)
 admin.site.register(EducationalModuleEnrollment, EducationalModuleEnrollmentAdmin)
 admin.site.register(EducationalModuleEnrollmentType)
 admin.site.register(EducationalModuleEnrollmentReason, EducationalModuleEnrollmentReasonAdmin)
 admin.site.register(Benefit, BenefitAdmin)
+admin.site.register(CoursePromotion, CoursePromotionAdmin)
