@@ -23,7 +23,8 @@ def enroll_button(context, course, session=None):
     if not session:
         session = course.next_session
     status = session.button_status(user) if session else course.button_status(user)
-    honor_accepted, enrolled, has_module = False, False, False
+    honor_accepted, enrolled = False, False
+    has_module = getattr(course, 'has_module', False)
     if session and authenticated:
         p = Participant.objects.filter(session=session, user=user)
         if p:
