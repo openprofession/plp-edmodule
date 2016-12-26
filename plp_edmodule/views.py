@@ -620,6 +620,8 @@ def enroll_on_course(session, request):
         return JsonResponse({'status': 0})
     elif verified and not participant and not session.allow_enrollments():
         return JsonResponse({'status': 0})
+    elif not verified and not session.has_honor_mode():
+        return JsonResponse({'status': 0})
 
     verified_type = session.get_verified_mode_enrollment_type()
     if verified and not verified_type:
@@ -638,10 +640,11 @@ def enroll_on_course(session, request):
         # если записи на курс не было
         try:
             _enroll(request=request, user=request.user, session=session)
+        except EDXEnrollmentError:
+            pass
+        finally:
             if verified:
                 # если надо записать в verified mode
                 participant = Participant.objects.get(session=session, user=request.user)
                 return _add_verified_entry(participant, verified_type)
             return JsonResponse({'status': 1})
-        except EDXEnrollmentError:
-            return JsonResponse({'status': 0, 'error': 'edx error'})
