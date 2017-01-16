@@ -473,7 +473,7 @@ def edmodule_catalog_view(request, category=None):
     """
     Передаваемый контекст:
     chosen_category: None или slug выбранной категории
-    categories: все существующие объекты Category
+    categories: все существующие объекты Category, имеющие курсы
     courses: словарь, ключ - id курса, значение: {
         'title': строка,
         'authors': массив строк,
@@ -517,9 +517,11 @@ def edmodule_catalog_view(request, category=None):
 
     through_model = CourseExtendedParameters._meta.get_field('categories').rel.through
     category_for_course = defaultdict(list)
-    q = through_model.objects.values_list('courseextendedparameters__course__id', 'category__id')
+    category_slugs_with_having_courses = set()
+    q = through_model.objects.values_list('courseextendedparameters__course__id', 'category__slug')
     for course, category in q:
         category_for_course[course].append(category)
+        category_slugs_with_having_courses.add(category)
 
     courses_query = Course.objects.filter(status='published').prefetch_related(
         'extended_params', 'extended_params__authors', 'course_sessions').distinct()
@@ -585,7 +587,7 @@ def edmodule_catalog_view(request, category=None):
 
     context = {
         'chosen_category': category,
-        'categories': Category.objects.all(),
+        'categories': Category.objects.filter(slug__in=category_slugs_with_having_courses),
         'courses': json.dumps(courses, ensure_ascii=False),
         'modules': json.dumps(modules, ensure_ascii=False),
         'course_covers': course_covers,
