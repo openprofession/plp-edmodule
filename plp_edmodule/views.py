@@ -473,7 +473,7 @@ def edmodule_catalog_view(request, category=None):
     """
     Передаваемый контекст:
     chosen_category: None или slug выбранной категории
-    categories: все существующие объекты Category
+    categories: все существующие объекты Category, имеющие курсы
     courses: словарь, ключ - id курса, значение: {
         'title': строка,
         'authors': массив строк,
@@ -517,10 +517,11 @@ def edmodule_catalog_view(request, category=None):
 
     through_model = CourseExtendedParameters._meta.get_field('categories').rel.through
     category_for_course = defaultdict(list)
-    q = through_model.objects.values_list('courseextendedparameters__course__id', 'category__id')
+    q = through_model.objects.values_list('courseextendedparameters__course__id', 'category__slug')
     for course, category in q:
         category_for_course[course].append(category)
 
+    category_slugs_with_having_courses = set()
     courses_query = Course.objects.filter(status='published').prefetch_related(
         'extended_params', 'extended_params__authors', 'course_sessions').distinct()
     # if not category:
@@ -530,6 +531,9 @@ def edmodule_catalog_view(request, category=None):
     #     courses_query = Course.objects.filter(status='published', extended_params__categories__slug=category).\
     #         prefetch_related('extended_params', 'extended_params__authors', 'course_sessions').distinct()
     for c in courses_query:
+        if (category_for_course.get(c.id)) != None:
+            for cat in category_for_course.get(c.id):
+              category_slugs_with_having_courses.add(cat) 
         if c.cover:
             cover_name = os.path.split(c.cover.name)[-1]
             if cover_name in all_course_covers:
@@ -585,7 +589,7 @@ def edmodule_catalog_view(request, category=None):
 
     context = {
         'chosen_category': category,
-        'categories': Category.objects.all(),
+        'categories': Category.objects.filter(slug__in=category_slugs_with_having_courses),
         'courses': json.dumps(courses, ensure_ascii=False),
         'modules': json.dumps(modules, ensure_ascii=False),
         'course_covers': course_covers,
