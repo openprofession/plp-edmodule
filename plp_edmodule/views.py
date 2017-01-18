@@ -357,7 +357,7 @@ def get_promoted_courses(limit=None):
         obj = item.content_object
         if obj:
             item_type = 'em' if isinstance(obj, EducationalModule) else 'course'
-            items.append({'type': item_type, 'item': obj})
+            items.append({'type': item_type, 'item': obj if item_type == 'em' else course_set_attrs(obj)})
     return items
 
 
