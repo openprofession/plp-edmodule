@@ -132,6 +132,11 @@ class EducationalModule(models.Model):
         return result
 
     def _get_sorted(self, attr):
+        """
+        Возвращает список элементов attr отсортированный по количеству курсов,
+        в которых этот attr встречается. Используется, например, для списка категорий
+        модуля, которые отстортированы по количеству курсов, в которых они встречаются
+        """
         d = {}
         for c in self.courses_extended.prefetch_related(attr):
             for item in getattr(c, attr).all():
@@ -191,6 +196,9 @@ class EducationalModule(models.Model):
 
     @cached_property
     def courses_extended(self):
+        """
+        CourseExtendedParameters всех курсов модуля
+        """
         return CourseExtendedParameters.objects.filter(course__id__in=self.courses.values_list('id', flat=True))
 
     def get_module_profit(self):
@@ -275,6 +283,9 @@ class EducationalModule(models.Model):
         return result
 
     def get_start_date(self):
+        """
+        дата старта первого курса модуля
+        """
         c = self.courses.first()
         if c and c.next_session:
             return c.next_session.datetime_starts
@@ -297,16 +308,28 @@ class EducationalModule(models.Model):
         return [(c, choose_closest_session(c)) for c in courses]
 
     def get_closest_course_with_session(self):
+        """
+        первый курс, не являющийся проектом, и соответствующая сессия модуля
+        """
         for c in self.courses.filter(extended_params__is_project=False):
             session = c.next_session
             if session and session.get_verified_mode_enrollment_type():
                 return c, session
 
     def may_enroll(self):
+        """
+        Проверка того, что пользователь может записаться на модуль
+        :return: bool
+        """
         courses = self.courses_with_closest_sessions
         return all(i[1] and i[1].allow_enrollments() for i in courses)
 
     def may_enroll_on_project(self, user):
+        """
+        Проверка того, что пользователь может записаться на проект
+        :param user: User
+        :return: bool
+        """
         if not user.is_authenticated():
             return False
         if not EducationalModuleEnrollment.objects.filter(user=user, module=self, is_active=True).exists():
@@ -334,9 +357,16 @@ class EducationalModule(models.Model):
         return qs
 
     def get_verified_mode_enrollment_type(self):
+        """
+        Метод аналогичный CourseSession
+        """
         return self.get_available_enrollment_types(mode='verified').first()
 
     def get_enrollment_reason_for_user(self, user):
+        """
+        queryset EducationalModuleEnrollmentReason для пользователя, первый элемент - полностью оплаченный,
+        если такой есть
+        """
         if user.is_authenticated():
             return EducationalModuleEnrollmentReason.objects.filter(
                 enrollment__user=user,
