@@ -18,10 +18,10 @@ from django.utils import timezone
 from django.utils.html import strip_tags, strip_spaces_between_tags
 from django.utils.text import Truncator
 from django.views.decorators.cache import cache_page
-from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason, SessionEnrollmentType
+from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason, SessionEnrollmentType, Instructor
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
-from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
+from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category, CourseCreator
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason, \
     BenefitLink, CoursePromotion
 from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict, \
@@ -550,7 +550,10 @@ def edmodule_catalog_view(request, category=None):
         max_length = CourseExtendedParameters._meta.get_field('short_description').max_length
         default_desc = strip_tags(strip_spaces_between_tags(c.description or ''))
         dic.update({
-            'authors_and_partners': [{'url': i.link, 'title': i.abbr or i.title} for i in c.get_authors_and_partners()],
+            'authors_and_partners': [{
+                                         'url': i.get_absolute_url() if i.status == CourseCreator.STATUS_CHOICES.PUBLISHED else '',
+                                         'title': i.abbr or i.title
+                                     } for i in c.get_authors_and_partners()],
             'catalog_marker': getattr(c, 'catalog_marker', ''),
             'short_description': getattr(c, 'short_description', '') or Truncator(default_desc).chars(max_length),
             'categories': category_for_course.get(c.id, []),
@@ -652,3 +655,58 @@ def enroll_on_course(session, request):
                 participant = Participant.objects.get(session=session, user=request.user)
                 return _add_verified_entry(participant, verified_type)
             return JsonResponse({'status': 1})
+
+
+def organization_view(request, code):
+    org = get_object_or_404(CourseCreator, slug=code)
+    if org.status == CourseCreator.STATUS_CHOICES.HIDDEN:
+        raise Http404
+
+    all_courses = [course_set_attrs(i) for i in
+                   Course.objects.filter(Q(extended_params__authors=org) | Q(extended_params__partners=org)).distinct()]
+    courses = [i.id for i in all_courses]
+    courses_info = Course.objects.filter(id__in=courses).aggregate(sum=Sum('sum_ratings'), count=Sum('count_ratings'))
+    if courses_info['count']:
+        course_mark = round(float(courses_info['sum']) / courses_info['count'], 2)
+    else:
+        course_mark = 0
+
+    modules = EducationalModule.objects.filter(courses__id__in=courses).distinct().prefetch_related('courses')
+    modules_info = modules.aggregate(sum=Sum('sum_ratings'), count=Sum('count_ratings'))
+    if modules_info['count']:
+        modules_mark = round(float(modules_info['sum']) / modules_info['count'], 2)
+    else:
+        modules_mark = 0
+
+    instructors = list(Instructor.objects.filter(instructor_courses__id__in=courses).distinct())
+    if org.teacher_order:
+        try:
+            order = {int(i): pos for pos, i in enumerate(org.teacher_order.split(',')) if i}
+            instructors = sorted(instructors, key=lambda x: order.get(x.id, 999))
+        except:
+            pass
+
+    courses_by_popularity = list(Course.objects.filter(id__in=courses).annotate(
+        cnt=Count('course_sessions__course_participant')).filter(cnt__gt=0).order_by('-cnt'))
+    popular = []
+    if courses_by_popularity:
+        for pos, course in enumerate(courses_by_popularity):
+            for m in modules:
+                if any(course.id == c.id for c in m.courses.all()):
+                    popular.append({'type': 'em', 'item': m})
+                    courses_by_popularity.pop(pos)
+                    break
+        for course in courses_by_popularity[:3]:
+            popular.append({'type': 'course', 'item': course_set_attrs(course)})
+        popular = popular[:3]
+
+    context = {
+        'object': org,
+        'courses_rating': course_mark,
+        'modules_rating': modules_mark,
+        'instructors': instructors,
+        'modules': modules,
+        'courses': all_courses,
+        'popular_programs': popular,
+    }
+    return render(request, 'edmodule/organization_page.html', context)
