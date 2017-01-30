@@ -23,7 +23,7 @@ from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category, CourseCreator
 from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason, \
-    BenefitLink
+    BenefitLink, CoursePromotion
 from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict, \
     count_user_score, update_modules_graduation
 from .signals import edmodule_enrolled
@@ -172,11 +172,11 @@ def update_context_with_modules(context, user):
 
     def _assign_module_tab(module, session, course):
         if session in current:
-            module.courses_current.append(course)
+            module.courses_current.append((course, session))
         if session in finished:
-            module.courses_finished.append(course)
+            module.courses_finished.append((course, session))
         if session in future:
-            module.courses_feature.append(course)
+            module.courses_feature.append((course, session))
 
     if user.is_authenticated():
         modules = EducationalModule.objects.filter(educationalmoduleenrollment__user=user).distinct().order_by('title')
@@ -189,6 +189,9 @@ def update_context_with_modules(context, user):
             reason_for_module[e.enrollment.module.id] = e
         for m in modules:
             m.enrollment_reason = reason_for_module.get(m.id)
+            price_data = m.get_price_list(user)
+            price_data.pop('courses', None)
+            m.price_data = json.dumps(price_data)
     else:
         modules = EducationalModule.objects.none()
     context['modules'] = modules
@@ -196,7 +199,9 @@ def update_context_with_modules(context, user):
     finished = context['courses_finished']
     future = context['courses_feature']
     upsales_for_session = defaultdict(list)
+    upsales_for_module = defaultdict(list)
     obj_enrollments_for_session = defaultdict(list)
+    obj_enrollments_for_module = defaultdict(list)
     modules_courses_ids = list(modules.values_list('courses__course_sessions__id', flat=True))
     modules_courses_ids = filter(lambda x: x, modules_courses_ids)
     if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
@@ -204,12 +209,20 @@ def update_context_with_modules(context, user):
         course_ids = [i.id for i in (finished + future + current)]
         course_ids = list(set(course_ids).union(set(modules_courses_ids)))
         ctype = ContentType.objects.get_for_model(CourseSession)
+        ctype_module = ContentType.objects.get_for_model(EducationalModule)
         upsale_links = UpsaleLink.objects.filter(content_type=ctype, object_id__in=course_ids, is_active=True)
+        module_upsale_links = UpsaleLink.objects.filter(content_type=ctype_module,
+                                                        object_id__in=[i.id for i in modules], is_active=True)
         for i in upsale_links:
             upsales_for_session[i.object_id].append(i)
+        for i in module_upsale_links:
+            upsales_for_module[i.object_id].append(i)
         obj_enrollments = ObjectEnrollment.objects.filter(upsale__in=upsale_links, user=user).select_related('upsale')
+        module_obj_enrollments = ObjectEnrollment.objects.filter(upsale__in=module_upsale_links, user=user).select_related('upsale')
         for i in obj_enrollments:
-            obj_enrollments_for_session[i.upsale.object_id].append(i)
+            obj_enrollments_for_session[i.upsale.object_id].append(i.upsale)
+        for i in module_obj_enrollments:
+            obj_enrollments_for_module[i.upsale.object_id].append(i.upsale)
     for i in (current + future + finished):
         i.upsales = upsales_for_session.get(i.id)
         i.bought_upsales = obj_enrollments_for_session.get(i.id)
@@ -234,13 +247,18 @@ def update_context_with_modules(context, user):
         'courses_finished': finished[:],
         'courses_feature': future[:]
     }
+    update_modules_graduation(user, context['courses_finished'])
     for module in context['modules']:
-        module.all_courses = module.courses.all()
+        all_courses = module.courses.all()
+        module.all_courses = zip(all_courses, [c.next_session for c in all_courses])
+        module.upsales = upsales_for_module.get(module.id, [])
+        module.bought_upsales = obj_enrollments_for_module.get(module.id, [])
         for attr in ['courses_current', 'courses_finished', 'courses_feature']:
             setattr(module, attr, [])
-        for index, course in enumerate(module.all_courses, 1):
+        for index, (course, __) in enumerate(module.all_courses, 1):
             course.available_sessions = available_sessions_for_course[course.id]
             course.index = index
+            course.has_module = True
             for session in sessions_for_course[course.id]:
                 session.participant = participant_for_session.get(session.id)
                 session.paid_enrollment = paid_enrollment_for_session.get(session.id)
@@ -257,9 +275,14 @@ def update_context_with_modules(context, user):
                     _remove_duplicates(session, without_duplicates.values())
     context.update(without_duplicates)
     context['courses_all'] = reduce(lambda x, y: x + y, without_duplicates.values(), [])
-    update_modules_graduation(user, context['courses_finished'])
     context['score'] = count_user_score(user)
     context['count_certificates'] = Participant.objects.filter(user=user, is_graduate=True).count()
+    context['count_participant'] = Participant.objects.filter(user=user).count()
+    counters = {}
+    for attr in ['courses_all', 'courses_current', 'courses_finished', 'courses_feature']:
+        counters[attr] = len(context[attr])
+        counters[attr] += sum([len(m.all_courses if attr == 'courses_all' else getattr(m, attr)) for m in modules])
+    context['counters'] = counters
 
 
 def update_course_details_context(context, user):
@@ -325,7 +348,28 @@ def update_course_details_context(context, user):
         pass
 
 
+def get_promoted_courses(limit=None):
+    qs = CoursePromotion.objects.all()
+    items = []
+    for item in qs:
+        if limit is not None and len(items) == limit:
+            break
+        obj = item.content_object
+        if obj:
+            item_type = 'em' if isinstance(obj, EducationalModule) else 'course'
+            items.append({'type': item_type, 'item': obj if item_type == 'em' else course_set_attrs(obj)})
+    return items
+
+
 def update_frontpage_context(context):
+    CNT_COURSES = 5
+    objects = get_promoted_courses(CNT_COURSES)
+    objects_ids = []
+    for item in objects:
+        objects_ids.append((
+            item['type'],
+            item['item'].id
+        ))
     now = timezone.now()
     course_ids = CourseSession.objects.filter(
         course__status=PUBLISHED,
@@ -339,8 +383,6 @@ def update_frontpage_context(context):
         by_category_dpo[c.id] = list(CourseExtendedParameters.objects.filter(
             categories=c, is_dpo=True, course__id__in=course_ids).values_list('course__id', flat=True))
 
-    objects, objects_ids = [], []
-    CNT_COURSES = 5
     for c, ids in by_category.iteritems():
         if len(objects) >= CNT_COURSES:
             break
@@ -357,7 +399,7 @@ def update_frontpage_context(context):
                 break
         if added_module:
             continue
-        added = [i[1] for i in objects_ids]
+        added = [i[1] for i in objects_ids if i[0] == 'course']
         c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_ids:
             objects.append({'type': 'course', 'item': course_set_attrs(c)})
@@ -372,7 +414,7 @@ def update_frontpage_context(context):
 
     objects_dpo, objects_dpo_ids = [], []
     for c, ids in by_category_dpo.iteritems():
-        if len(objects_dpo) > 5:
+        if len(objects_dpo) > CNT_COURSES:
             break
         modules = EducationalModule.objects.filter(
             status=PUBLISHED,
@@ -387,7 +429,7 @@ def update_frontpage_context(context):
                 break
         if added_module:
             continue
-        added = [i[1] for i in objects_dpo_ids]
+        added = [i[1] for i in objects_dpo_ids if i[0] == 'course']
         c = Course.objects.filter(id__in=ids).exclude(id__in=added).first()
         if c and ('course', c.id) not in objects_dpo_ids:
             objects_dpo.append({'type': 'course', 'item': course_set_attrs(c)})
@@ -430,7 +472,7 @@ def edmodule_filter_view(request):
 def edmodule_catalog_view(request, category=None):
     """
     Передаваемый контекст:
-    chosen_category: None или slug выбранной категории
+    chosen_category: None или slug выбранной категории, имеющие курсы
     categories: все существующие объекты Category
     courses: словарь, ключ - id курса, значение: {
         'title': строка,
@@ -475,10 +517,11 @@ def edmodule_catalog_view(request, category=None):
 
     through_model = CourseExtendedParameters._meta.get_field('categories').rel.through
     category_for_course = defaultdict(list)
-    q = through_model.objects.values_list('courseextendedparameters__course__id', 'category__id')
+    q = through_model.objects.values_list('courseextendedparameters__course__id', 'category__slug')
     for course, category in q:
         category_for_course[course].append(category)
 
+    category_slugs_with_having_courses = set()
     courses_query = Course.objects.filter(status='published').prefetch_related(
         'extended_params', 'extended_params__authors', 'course_sessions').distinct()
     # if not category:
@@ -488,6 +531,9 @@ def edmodule_catalog_view(request, category=None):
     #     courses_query = Course.objects.filter(status='published', extended_params__categories__slug=category).\
     #         prefetch_related('extended_params', 'extended_params__authors', 'course_sessions').distinct()
     for c in courses_query:
+        if (category_for_course.get(c.id)) is not None:
+            for cat in category_for_course.get(c.id):
+                category_slugs_with_having_courses.add(cat) 
         if c.cover:
             cover_name = os.path.split(c.cover.name)[-1]
             if cover_name in all_course_covers:
@@ -546,7 +592,7 @@ def edmodule_catalog_view(request, category=None):
 
     context = {
         'chosen_category': category,
-        'categories': Category.objects.all(),
+        'categories': Category.objects.filter(slug__in=category_slugs_with_having_courses),
         'courses': json.dumps(courses, ensure_ascii=False),
         'modules': json.dumps(modules, ensure_ascii=False),
         'course_covers': course_covers,
@@ -581,6 +627,8 @@ def enroll_on_course(session, request):
         return JsonResponse({'status': 0})
     elif verified and not participant and not session.allow_enrollments():
         return JsonResponse({'status': 0})
+    elif not verified and not session.has_honor_mode():
+        return JsonResponse({'status': 0})
 
     verified_type = session.get_verified_mode_enrollment_type()
     if verified and not verified_type:
@@ -599,13 +647,14 @@ def enroll_on_course(session, request):
         # если записи на курс не было
         try:
             _enroll(request=request, user=request.user, session=session)
+        except EDXEnrollmentError:
+            pass
+        finally:
             if verified:
                 # если надо записать в verified mode
                 participant = Participant.objects.get(session=session, user=request.user)
                 return _add_verified_entry(participant, verified_type)
             return JsonResponse({'status': 1})
-        except EDXEnrollmentError:
-            return JsonResponse({'status': 0, 'error': 'edx error'})
 
 
 def organization_view(request, code):

@@ -239,7 +239,7 @@ class EducationalModule(models.Model):
                     if r.participant.is_graduate:
                         should_pay = False
                         break
-                    if r.participant.session.datetime_ends and r.participant.session.datetime_ends < now:
+                    if r.participant.session.datetime_ends and r.participant.session.datetime_ends > now:
                         should_pay = False
                         break
                 if not should_pay:
@@ -474,8 +474,8 @@ class Benefit(models.Model):
 
 
 class BenefitLink(models.Model):
-    limit_models = models.Q(app_label='plp_edmodule', model='educationalmodule')
-
+    limit_models = models.Q(app_label='plp_edmodule', model='educationalmodule') | \
+                   models.Q(app_label='plp', model='course')
     benefit = models.ForeignKey('Benefit', verbose_name=_(u'Выгода'), related_name='benefit_links')
     content_type = models.ForeignKey(ContentType, limit_choices_to=limit_models,
                                      verbose_name=_(u'Тип объекта, к которому выгода'))
@@ -489,6 +489,25 @@ class BenefitLink(models.Model):
             content_type=ctype,
             object_id=obj.id
         ).select_related('benefit')
+
+
+class CoursePromotion(models.Model):
+    limit_models = models.Q(app_label='plp_edmodule', model='educationalmodule') | \
+                   models.Q(app_label='plp', model='course')
+    content_type = models.ForeignKey(ContentType, limit_choices_to=limit_models,
+                                     verbose_name=_(u'Тип объекта'))
+    object_id = models.PositiveIntegerField(verbose_name=_(u'Id объекта'))
+    content_object = GenericForeignKey('content_type', 'object_id')
+    content_object.short_description = _(u'Объект')
+    sort = models.SmallIntegerField(verbose_name=_(u'Приоритет'), unique=True)
+
+    class Meta:
+        verbose_name = _(u'Порядок курсов и специализаций на главной')
+        verbose_name_plural = _(u'Порядок курсов и специализаций на главной')
+        ordering = ['sort']
+
+    def __unicode__(self):
+        return u'%s - %s' % (self.sort, self.content_object)
 
 
 edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
