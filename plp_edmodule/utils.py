@@ -135,6 +135,9 @@ def get_feedback_list(module):
 
 
 def get_status_dict(session):
+    """
+    Статус сессии для отрисовки в шаблоне
+    """
     months = {
         1: _(u'января'),
         2: _(u'февраля'),
@@ -269,6 +272,9 @@ def course_set_attrs(instance):
 
 
 def button_status_project(session, user):
+    """
+    хелпер для использования в CourseSession.button_status
+    """
     status = {'code': 'project_button', 'active': False, 'is_authenticated': user.is_authenticated()}
     containing_module = EducationalModule.objects.filter(courses__id=session.course.id).first()
     if containing_module:

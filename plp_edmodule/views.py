@@ -21,11 +21,12 @@ from django.views.decorators.cache import cache_page
 from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason, SessionEnrollmentType, Instructor
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
-from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category, CourseCreator
-from .models import EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason, \
-    BenefitLink, CoursePromotion
-from .utils import update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict, \
-    count_user_score, update_modules_graduation
+from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
+from .models import (
+    EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason,
+    BenefitLink, CoursePromotion)
+from .utils import (update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict,
+    count_user_score, update_modules_graduation)
 from .signals import edmodule_enrolled
 
 
@@ -349,6 +350,11 @@ def update_course_details_context(context, user):
 
 
 def get_promoted_courses(limit=None):
+    """
+    Список курсов и модулей, которые должны быть первыми на главной в нужном формате
+    :param limit: int максимум элементов
+    :return: [{'type': 'em'/'course', 'item': Course/EducationalModule}, ...]
+    """
     qs = CoursePromotion.objects.all()
     items = []
     for item in qs:
@@ -362,6 +368,9 @@ def get_promoted_courses(limit=None):
 
 
 def update_frontpage_context(context):
+    """
+    Обновление контекста для главной страницы
+    """
     CNT_COURSES = 5
     objects = get_promoted_courses(CNT_COURSES)
     objects_ids = []
@@ -473,36 +482,26 @@ def edmodule_catalog_view(request, category=None):
     """
     Передаваемый контекст:
     chosen_category: None или slug выбранной категории, имеющие курсы
-    categories: все существующие объекты Category
+    categories: объекты Category с опубликованными курсами
     courses: словарь, ключ - id курса, значение: {
         'title': строка,
-        'authors': массив строк,
         'course_status_params': {
             'status': строка 'scheduled', 'started' или '',
             'date': опционально если status != '', дата окончания записи если status == 'started',
                 дата начала курса если status == 'scheduled', строка вида дд.мм.гггг,
             'days_before_start': опционально если status == 'scheduled' число дней до начала курса
+        'authors_and_partners': [{'url': str, 'title': str}, ...],
+        'catalog_marker': str,
+        'short_description': str,
+        'categories': list
         }
     }
-    modules: аналогично courses, значение: {
-        'title',
-        'authors',
-        'course_status_params',
+    modules: аналогично courses, с добавлением: {
         'count_courses': число курсов в модуле
     }
     course_covers: словарь, ключ - id курса, значение - объект картинки курса
     module_covers: аналогично course_covers
     """
-    def _choose_closest_session(c):
-        sessions = c.course_sessions.all()
-        if sessions:
-            sessions = filter(lambda x: x.datetime_end_enroll and x.datetime_end_enroll > timezone.now()
-                                    and x.datetime_starts, sessions)
-            sessions = sorted(sessions, key=lambda x: x.datetime_end_enroll)
-            if sessions:
-                return sessions[0]
-        return None
-
     courses, modules, course_covers, module_covers = {}, {}, {}, {}
     cover_path = Course._meta.get_field('cover').upload_to
     try:
@@ -558,7 +557,7 @@ def edmodule_catalog_view(request, category=None):
             'short_description': getattr(c, 'short_description', '') or Truncator(default_desc).chars(max_length),
             'categories': category_for_course.get(c.id, []),
         })
-        session = _choose_closest_session(c)
+        session = choose_closest_session(c)
         dic.update({'course_status_params': get_status_dict(session)})
         courses[c.id] = dic
 
@@ -602,6 +601,9 @@ def edmodule_catalog_view(request, category=None):
 
 
 def enroll_on_course(session, request):
+    """
+    обработка стандартного метода записи на курс для openprofession
+    """
     def _add_verified_entry(participant, verified_type):
         try:
             EnrollmentReason.objects.create(

@@ -18,6 +18,9 @@ except RuntimeError:
 
 @register.inclusion_tag('course/_enroll_button.html', takes_context=True)
 def enroll_button(context, course, session=None):
+    """
+    отрисовка кнопки записи для курса
+    """
     user = context['request'].user
     authenticated = user.is_authenticated()
     if not session:
@@ -84,6 +87,9 @@ def enroll_button(context, course, session=None):
 
 @register.filter
 def split_text(value, splitter=None):
+    """
+    разбивка value по splitter, дефолтно - по строкам
+    """
     if not value:
         return []
     if splitter is None:
