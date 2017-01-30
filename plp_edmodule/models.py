@@ -474,8 +474,8 @@ class Benefit(models.Model):
 
 
 class BenefitLink(models.Model):
-    limit_models = models.Q(app_label='plp_edmodule', model='educationalmodule')
-
+    limit_models = models.Q(app_label='plp_edmodule', model='educationalmodule') | \
+                   models.Q(app_label='plp', model='course')
     benefit = models.ForeignKey('Benefit', verbose_name=_(u'Выгода'), related_name='benefit_links')
     content_type = models.ForeignKey(ContentType, limit_choices_to=limit_models,
                                      verbose_name=_(u'Тип объекта, к которому выгода'))
