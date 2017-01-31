@@ -21,12 +21,12 @@ from django.views.decorators.cache import cache_page
 from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason, SessionEnrollmentType, Instructor
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
-from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category
+from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category, CourseCreator
 from .models import (
     EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason,
     BenefitLink, CoursePromotion)
 from .utils import (update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict,
-    count_user_score, update_modules_graduation)
+    count_user_score, update_modules_graduation, choose_closest_session)
 from .signals import edmodule_enrolled
 
 
