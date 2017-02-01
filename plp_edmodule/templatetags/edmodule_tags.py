@@ -17,7 +17,7 @@ except RuntimeError:
 
 
 @register.inclusion_tag('course/_enroll_button.html', takes_context=True)
-def enroll_button(context, course, session=None):
+def enroll_button(context, course, session=None, html_location=None):
     """
     отрисовка кнопки записи для курса
     """
@@ -82,6 +82,7 @@ def enroll_button(context, course, session=None):
         'has_paid': has_paid,
         'has_module': has_module,
         'materials_available': materials_available,
+        'html_location': html_location,
     }
 
 
