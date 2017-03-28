@@ -318,9 +318,9 @@ def update_course_details_context(context, user):
         related = []
         if categories:
             modules = EducationalModule.objects.filter(
-                courses__extended_params__categories__in=categories).distinct()
+                courses__extended_params__categories__in=categories,status='published').distinct()
             courses = Course.objects.exclude(id=context['object'].id).filter(
-                extended_params__categories__in=categories).distinct()
+                extended_params__categories__in=categories,status='published').distinct()
             if modules:
                 related = [
                     {'type': 'em', 'item': random.sample(modules, 1)[0]},

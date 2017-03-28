@@ -34,6 +34,7 @@ ICON_THUMB_SIZE = (
 class EducationalModule(models.Model):
     STATUSES = (
         (HIDDEN, _(u'Скрыт')),
+        (DIRECT, _(u'Доступ по ссылке')),
         (PUBLISHED, _(u'Опубликован')),
     )
     code = models.SlugField(verbose_name=_(u'Код'), unique=True)
@@ -173,9 +174,9 @@ class EducationalModule(models.Model):
         if not categories:
             return []
         modules = EducationalModule.objects.exclude(id=self.id).filter(
-            courses__extended_params__categories__in=categories).distinct()
+            courses__extended_params__categories__in=categories,status='published').distinct()
         courses = Course.objects.exclude(id__in=self.courses.values_list('id', flat=True)).filter(
-            extended_params__categories__in=categories).distinct()
+            extended_params__categories__in=categories,status='published').distinct()
         related = []
         if modules:
             related.append({'type': 'em', 'item': random.sample(modules, 1)[0]})
