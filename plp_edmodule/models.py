@@ -23,6 +23,7 @@ from .signals import edmodule_enrolled, edmodule_enrolled_handler, edmodule_paye
     edmodule_unenrolled, edmodule_unenrolled_handler
 
 HIDDEN = 'hidden'
+DIRECT = 'direct'
 PUBLISHED = 'published'
 
 ICON_THUMB_SIZE = (
