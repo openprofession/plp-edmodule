@@ -380,7 +380,7 @@ class EducationalModule(models.Model):
         Сессия первого курса, который пользователь может купить.
         Возвращает (сессия, цена) или None
         """
-        auth = user.is_authenticated()
+        auth = user.is_authenticated() if user else None
         for course in self.courses.exclude(extended_params__is_project=True):
             session = course.next_session
             if session:
