@@ -557,7 +557,7 @@ class PromoCode(models.Model):
  
     code = models.CharField(_(u'Промокод'), max_length=6, blank=True, null=False)
     product_type = models.CharField(_(u'Тип продукта'), max_length=10, choices=PRODUCTS, default='course', blank=False, null=False)
-    course = models.ForeignKey(Course, related_name='course', verbose_name=_(u'Курс'), blank=True, null=True)
+    course = models.ForeignKey(Course, verbose_name=_(u'Курс'), blank=True, null=True)
     edmodule = models.ForeignKey(EducationalModule, related_name='edmodule', verbose_name=_(u'Специализация'), blank=True, null=True)
     active_till = models.DateField(_(u'Актуален до даты'), blank=False, null=False)
     max_usage = models.PositiveSmallIntegerField(_(u'Количество возможных оплат'), blank=False, null=False)
