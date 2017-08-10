@@ -327,7 +327,7 @@ def count_user_score(user):
 
 def generate_promocode(iter=0):
     promocode = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(DEFAULT_PROMOCODE_LENGTH))
-    if iter > 1000:
+    if iter > 100:
         raise Exception('Can\'t generate unique promocode')
     if PromoCode.objects.filter(code=promocode):
         iter += 1
