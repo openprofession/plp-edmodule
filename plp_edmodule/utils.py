@@ -325,17 +325,13 @@ def count_user_score(user):
         'whole_score': course_score + module_score,
     }
 
-def generate_promocode():
-    promocode = ""
-    letters = string.letters + '1234567890'
-  
-    while True:
-        for _ in range(DEFAULT_PROMOCODE_LENGTH):
-            promocode += random.choice(letters).upper()
-        try:
-            PromoCode.objects.get(code=promocode)
-        except PromoCode.DoesNotExist:
-            break
-
-    return promocode
+def generate_promocode(iter=0):
+    promocode = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(DEFAULT_PROMOCODE_LENGTH))
+    if iter > 1000:
+        raise Exception('Can\'t generate unique promocode')
+    if PromoCode.objects.filter(code=promocode):
+        iter += 1
+        return generate_promocode(iter)
+    else:
+        return promocode
 
