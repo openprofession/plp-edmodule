@@ -14,6 +14,7 @@ from statistics.admin import RemoveDeleteActionMixin
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.admin import EducationalModuleExtendedInline
 from opro_payments.admin_forms import UpsaleFormCheckerMixin
+from .utils import generate_promocode
 from .models import (
     EducationalModule,
     EducationalModuleEnrollment,
@@ -22,6 +23,7 @@ from .models import (
     Benefit,
     BenefitLink,
     CoursePromotion,
+    PromoCode
 )
 
 
@@ -129,9 +131,84 @@ class CoursePromotionAdmin(admin.ModelAdmin):
     list_display = ('sort', 'content_type', 'object_id', 'content_object')
 
 
+class PromoCodeForm(forms.ModelForm):
+
+    class Meta:
+        model = PromoCode
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        if not kwargs.get('instance', None) and len(args) == 0:
+            kwargs['initial'] = {}
+            kwargs['initial']['code'] = generate_promocode()
+            
+        super(PromoCodeForm, self).__init__(*args, **kwargs)
+        
+        if self.instance.used is None:
+            self.instance.used = 0
+
+    def clean(self):
+        errors = {}
+
+        product_type = self.cleaned_data.get('product_type')
+        course = self.cleaned_data.get('course')
+        edmodule = self.cleaned_data.get('edmodule')
+
+        discount_percent = self.cleaned_data.get('discount_percent')
+        discount_price = self.cleaned_data.get('discount_price')
+
+        if product_type == 'course' and not course:
+            errors.update({
+                'course': 'Выберите курс'
+            })
+
+        if product_type == 'edmodule' and not edmodule:
+            errors.update({
+                'edmodule': 'Выберите специализацию'
+            })
+
+        if discount_percent < 1 and not discount_price:
+            errors.update({ 
+                'discount_percent': 'Убедитесь, что это значение больше либо равно 1.', 
+            })
+
+        if discount_price < 1 and not discount_percent:
+            errors.update({ 
+                'discount_price': 'Убедитесь, что это значение больше либо равно 1.', 
+            })
+
+        if discount_percent is None and discount_price is None:
+            msg = 'Заполните либо процент скидки, либо сумму'
+            errors.update({ 
+                'discount_percent': msg, 
+                'discount_price': msg 
+            })
+
+        if discount_percent and discount_price:
+            msg = 'Должно быть заполнено только одно из этих значений'
+            errors.update({ 
+                'discount_percent': msg, 
+                'discount_price': msg 
+            })
+
+        if errors:
+            raise forms.ValidationError(errors)
+
+        return self.cleaned_data
+
+class PromoCodeAdmin(admin.ModelAdmin):
+
+    class Media:
+        js = ('/static/admin/js/promocode.js',)
+
+    form = PromoCodeForm
+    readonly_fields = ('used',) 
+    fields = ('code', 'product_type', 'course', 'edmodule', 'active_till', 'max_usage', 'used', 'use_with_others', 'discount_percent', 'discount_price')
+
 admin.site.register(EducationalModule, EducationalModuleAdmin)
 admin.site.register(EducationalModuleEnrollment, EducationalModuleEnrollmentAdmin)
 admin.site.register(EducationalModuleEnrollmentType)
 admin.site.register(EducationalModuleEnrollmentReason, EducationalModuleEnrollmentReasonAdmin)
 admin.site.register(Benefit, BenefitAdmin)
 admin.site.register(CoursePromotion, CoursePromotionAdmin)
+admin.site.register(PromoCode, PromoCodeAdmin)

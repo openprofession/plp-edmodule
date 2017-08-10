@@ -3,6 +3,8 @@
 import logging
 import requests
 import types
+import random
+import string
 from collections import defaultdict
 from django.db.models import Count, Sum
 from django.conf import settings
@@ -17,7 +19,7 @@ from plp.models import CourseSession, Participant
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.models import EducationalModuleExtendedParameters
 from plp_eduplanner.models import CourseComp, Competence
-from .models import EducationalModuleProgress, EducationalModuleRating, EducationalModule, EducationalModuleEnrollment
+from .models import PromoCode, EducationalModuleProgress, EducationalModuleRating, EducationalModule, EducationalModuleEnrollment
 
 RAVEN_CONFIG = getattr(settings, 'RAVEN_CONFIG', {})
 client = None
@@ -26,7 +28,7 @@ if RAVEN_CONFIG:
     client = Client(RAVEN_CONFIG.get('dsn'))
 
 REQUEST_TIMEOUT = 10
-
+DEFAULT_PROMOCODE_LENGTH = 6
 
 class EDXTimeoutError(EDXEnrollmentError):
     pass
@@ -322,3 +324,14 @@ def count_user_score(user):
         'course_score': course_score,
         'whole_score': course_score + module_score,
     }
+
+def generate_promocode(iter=0):
+    promocode = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(DEFAULT_PROMOCODE_LENGTH))
+    if iter > 100:
+        raise Exception('Can\'t generate unique promocode')
+    if PromoCode.objects.filter(code=promocode):
+        iter += 1
+        return generate_promocode(iter)
+    else:
+        return promocode
+

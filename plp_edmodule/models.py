@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core import validators
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -14,6 +15,8 @@ from jsonfield import JSONField
 from sortedm2m.fields import SortedManyToManyField
 from imagekit.models import ImageSpecField
 from imagekit.processors import Resize
+from datetime import datetime
+from decimal import Decimal
 from plp.models import Course, User, SessionEnrollmentType, Participant, CourseSession, EnrollmentReason
 from plp_extension.apps.course_review.models import AbstractRating
 from plp_extension.apps.course_review.signals import course_rating_updated_or_created, update_mean_ratings
@@ -540,6 +543,129 @@ class CoursePromotion(models.Model):
 
     def __unicode__(self):
         return u'%s - %s' % (self.sort, self.content_object)
+
+class PromoCode(models.Model):
+
+    PRODUCTS = (
+        ('course', _(u'Курс')),
+        ('edmodule', _(u'Специализация')),
+    )
+
+    class Meta:
+        verbose_name = _(u'Промокод')
+        verbose_name_plural = _(u'Промокоды')
+ 
+    code = models.CharField(_(u'Промокод'), max_length=6, blank=True, null=False)
+    product_type = models.CharField(_(u'Тип продукта'), max_length=10, choices=PRODUCTS, default='course', blank=False, null=False)
+    course = models.ForeignKey(Course, verbose_name=_(u'Курс'), blank=True, null=True)
+    edmodule = models.ForeignKey(EducationalModule, related_name='edmodule', verbose_name=_(u'Специализация'), blank=True, null=True)
+    active_till = models.DateField(_(u'Актуален до даты'), blank=False, null=False)
+    max_usage = models.PositiveSmallIntegerField(_(u'Количество возможных оплат'), blank=False, null=False)
+    used = models.PositiveSmallIntegerField(_(u'Был использован'), null=False)
+    use_with_others = models.BooleanField(_(u'Применяется с другими скидками'), default=True)
+    discount_percent = models.DecimalField(_(u'Процент скидки'), max_digits=5, decimal_places=2, blank=True, null=True)
+    discount_price = models.DecimalField(_(u'Новая стоимость курса'), max_digits=8, decimal_places=2, blank=True, null=True)
+
+    def __unicode__(self):
+        product_name = self.edmodule.title if self.product_type == 'edmodule' else self.course.title
+        discount = "%0.0f" % (self.discount_percent) + '%' if self.discount_percent else "%0.2f" % (self.discount_price) + u' руб'      
+        return u"{0} - {1} - {2}".format(self.code, product_name, discount)
+
+    def validate(self, product_id, product_type):
+        """ Возвращает словарь со статусом валидации (валиден = 0, есть ошибки = 1), 
+            а также сообщение, содержащие суть ошибки """
+
+        msg = u'данному курсу' if product_type == self.PRODUCTS[0][0] else u'данной специализации'
+        if self.product_type == self.PRODUCTS[1][0] and not self.product_type == product_type and not self.edmodule.id == product_id:
+            return {
+                'status': 1,
+                'message': unicode(_(u'Промокод не принадлежит ' + msg))
+            }
+        elif self.product_type == self.PRODUCTS[0][0] and not self.product_type == product_type and not self.course.id == product_id:
+            return {
+                'status': 1,
+                'message': unicode(_(u'Промокод не принадлежит ' + msg))
+            }
+
+        if self.used >= self.max_usage:
+            return {
+                'status': 1,
+                'message': unicode(_(u'Промокод уже был использован'))
+            }
+
+        
+        if datetime.now().date() > self.active_till:
+            return {
+                'status': 1,
+                'message': unicode(_(u'Срок действия промокода истек'))
+            }
+
+        return {
+            'status': 0,
+            'message': unicode(_(u'Промокод действителен'))
+        }
+
+    def calculate(self, product_id=None, only_first_course=None, session_id=None):
+        """ Производит расчет по переданным параметрам и, в соответствие, с логикой задачи OP-614 """
+            
+        if self.discount_price:
+            return {
+                'status': 0,
+                'new_price': self.discount_price
+            }   
+
+        if self.product_type == self.PRODUCTS[1][0]:
+            try:
+                edmodule = EducationalModule.objects.get(id=product_id)
+            except ObjectDoesNotExist:
+                return {
+                    'status': 1,
+                    'message': unicode(_(u'Не удалось найти специализацию'))
+                }
+
+            price = edmodule.get_price_list()
+
+            if only_first_course == True:
+                first_course_price = edmodule.get_first_session_to_buy(None)[1]
+                price['price'] = first_course_price
+                price['whole_price'] = first_course_price * (1 - price['discount'] / 100.)
+            
+            if self.use_with_others:
+                full_discount = self.discount_percent + Decimal(price['discount'])
+                new_price = Decimal(price['price']) * (1 - full_discount / 100)
+                return {
+                    'status': 0,
+                    'new_price': new_price.quantize(Decimal('.00'))
+                }    
+            else:
+                if Decimal(price['discount']) > self.discount_percent:
+                    return {
+                        'status': 0,
+                        'new_price': Decimal(price['whole_price']).quantize(Decimal('.00'))
+                    }  
+                else:
+                    new_price = Decimal(price['price']) * (1 - self.discount_percent / 100)
+                    return {
+                        'status': 0,
+                        'new_price': new_price.quantize(Decimal('.00'))
+                    }
+
+        if self.product_type == self.PRODUCTS[0][0]:
+            try:
+                session = CourseSession.objects.get(id=session_id)
+            except ObjectDoesNotExist:
+                return {
+                    'status': 1,
+                    'message': unicode(_(u'Не удалось найти курс'))
+                }
+
+            verified = session.get_verified_mode_enrollment_type()
+            new_price = Decimal(verified.price) * (1 - self.discount_percent / 100)
+            
+            return {
+                'status': 0,
+                'new_price': new_price.quantize(Decimal('.00'))
+            }  
 
 
 edmodule_enrolled.connect(edmodule_enrolled_handler, sender=EducationalModuleEnrollment)
