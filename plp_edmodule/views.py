@@ -615,7 +615,7 @@ def edmodule_catalog_view(request, category=None):
         courses[c.id] = dic
 
     count_courses_dict = dict(EducationalModule.objects.annotate(cnt=Count('courses')).values_list('code', 'cnt'))
-    edmodule_query = EducationalModule.objects.filter(status='published', courses__id__in=courses.keys()).\
+    edmodule_query = EducationalModule.objects.filter(status='published').\
         select_related('extended_params')
     if sp:
         edmodule_query = edmodule_query.filter(spec_projects=sp)
@@ -634,6 +634,7 @@ def edmodule_catalog_view(request, category=None):
             extended = None
         categories = reduce(lambda x, y: x + y, [category_for_course.get(i.id, []) for i in m.courses.all()], [])
         categories = list(set(categories))
+        category_slugs_with_having_courses = category_slugs_with_having_courses.union(set(categories))
         dic = {
             'title': m.title,
             'authors_and_partners': [{'url': i.link, 'title': i.abbr or i.title} for i in m.get_authors_and_partners()],
