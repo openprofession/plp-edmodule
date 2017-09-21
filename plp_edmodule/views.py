@@ -275,16 +275,46 @@ def update_context_with_modules(context, user):
                 if session.participant:
                     _assign_module_tab(module, session, course)
                     _remove_duplicates(session, without_duplicates.values())
+    all_courses = reduce(lambda x, y: x + y, without_duplicates.values(), [])
+    without_duplicates['all_courses'] = all_courses
     context.update(without_duplicates)
-    context['courses_all'] = reduce(lambda x, y: x + y, without_duplicates.values(), [])
     context['score'] = count_user_score(user)
     context['count_certificates'] = Participant.objects.filter(user=user, is_graduate=True).count()
     context['count_participant'] = Participant.objects.filter(user=user).count()
     counters = {}
-    for attr in ['courses_all', 'courses_current', 'courses_finished', 'courses_feature']:
+    for attr in without_duplicates.keys():
         counters[attr] = len(context[attr])
-        counters[attr] += sum([len(m.all_courses if attr == 'courses_all' else getattr(m, attr)) for m in modules])
+        counters[attr] += sum([len(getattr(m, attr)) for m in modules])
+    RelCourse = Course._meta.get_field('spec_projects').rel.through
+    RelEdModule = EducationalModule._meta.get_field('spec_projects').rel.through
+    specproject_for_course = {}
+    specprojects = {i.id: i for i in SpecProject.objects.all()}
+    for item in RelCourse.objects.filter(course_id__in=[i.course_id for i in all_courses]).order_by('specproject_id'):
+        if item.course_id not in specproject_for_course:
+            specproject_for_course[item.course_id] = specprojects[item.specproject_id]
+    specproject_for_module = {}
+    for item in RelEdModule.objects.filter(educationalmodule__in=modules).order_by('specproject_id'):
+        if item.educationalmodule_id not in specproject_for_module:
+            specproject_for_module[item.educationalmodule_id] = specprojects[item.specproject_id]
+    modules = list(modules)
+    specprojects_data = {}
+    for m in modules[:]:
+        sp = specproject_for_module.get(m.id)
+        if sp:
+            modules.remove(m)
+            specprojects_data.setdefault(sp, {}).setdefault('modules', []).append(m)
+    for title, courses in without_duplicates.items():
+        copy_courses = courses[:]
+        for c in copy_courses:
+            sp = specproject_for_course.get(c.course_id)
+            if sp:
+                courses.remove(c)
+                specprojects_data.setdefault(sp, {}).setdefault('courses', {}).setdefault(title, []).append(c)
     context['counters'] = counters
+    context.update({
+        'modules': modules,
+        'specprojects_data': specprojects_data,
+    })
 
 
 def update_course_details_context(context, user):
