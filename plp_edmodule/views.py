@@ -22,6 +22,7 @@ from plp.models import HonorCode, CourseSession, Course, Participant, Enrollment
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category, CourseCreator
+from specproject.models import SpecProject
 from .models import (
     EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason,
     BenefitLink, CoursePromotion)
@@ -274,16 +275,46 @@ def update_context_with_modules(context, user):
                 if session.participant:
                     _assign_module_tab(module, session, course)
                     _remove_duplicates(session, without_duplicates.values())
+    all_courses = reduce(lambda x, y: x + y, without_duplicates.values(), [])
+    without_duplicates['all_courses'] = all_courses
     context.update(without_duplicates)
-    context['courses_all'] = reduce(lambda x, y: x + y, without_duplicates.values(), [])
     context['score'] = count_user_score(user)
     context['count_certificates'] = Participant.objects.filter(user=user, is_graduate=True).count()
     context['count_participant'] = Participant.objects.filter(user=user).count()
     counters = {}
-    for attr in ['courses_all', 'courses_current', 'courses_finished', 'courses_feature']:
+    for attr in without_duplicates.keys():
         counters[attr] = len(context[attr])
-        counters[attr] += sum([len(m.all_courses if attr == 'courses_all' else getattr(m, attr)) for m in modules])
+        counters[attr] += sum([len(getattr(m, attr)) for m in modules])
+    RelCourse = Course._meta.get_field('spec_projects').rel.through
+    RelEdModule = EducationalModule._meta.get_field('spec_projects').rel.through
+    specproject_for_course = {}
+    specprojects = {i.id: i for i in SpecProject.objects.all()}
+    for item in RelCourse.objects.filter(course_id__in=[i.course_id for i in all_courses]).order_by('specproject_id'):
+        if item.course_id not in specproject_for_course:
+            specproject_for_course[item.course_id] = specprojects[item.specproject_id]
+    specproject_for_module = {}
+    for item in RelEdModule.objects.filter(educationalmodule__in=modules).order_by('specproject_id'):
+        if item.educationalmodule_id not in specproject_for_module:
+            specproject_for_module[item.educationalmodule_id] = specprojects[item.specproject_id]
+    modules = list(modules)
+    specprojects_data = {}
+    for m in modules[:]:
+        sp = specproject_for_module.get(m.id)
+        if sp:
+            modules.remove(m)
+            specprojects_data.setdefault(sp, {}).setdefault('modules', []).append(m)
+    for title, courses in without_duplicates.items():
+        copy_courses = courses[:]
+        for c in copy_courses:
+            sp = specproject_for_course.get(c.course_id)
+            if sp:
+                courses.remove(c)
+                specprojects_data.setdefault(sp, {}).setdefault('courses', {}).setdefault(title, []).append(c)
     context['counters'] = counters
+    context.update({
+        'modules': modules,
+        'specprojects_data': specprojects_data,
+    })
 
 
 def update_course_details_context(context, user):
@@ -349,13 +380,13 @@ def update_course_details_context(context, user):
         pass
 
 
-def get_promoted_courses(limit=None):
+def get_promoted_courses(limit=None, sp=None):
     """
     Список курсов и модулей, которые должны быть первыми на главной в нужном формате
     :param limit: int максимум элементов
     :return: [{'type': 'em'/'course', 'item': Course/EducationalModule}, ...]
     """
-    qs = CoursePromotion.objects.all()
+    qs = CoursePromotion.objects.filter(spec_project=sp)
     items = []
     for item in qs:
         if limit is not None and len(items) == limit:
@@ -367,12 +398,17 @@ def get_promoted_courses(limit=None):
     return items
 
 
-def update_frontpage_context(context):
+def update_frontpage_context(context, request):
     """
     Обновление контекста для главной страницы
     """
+    sp = None
+    if request.subdomain:
+        sp = SpecProject.get_by_subdomain(request.subdomain)
+        if not sp:
+            raise Http404
     CNT_COURSES = 5
-    objects = get_promoted_courses(CNT_COURSES)
+    objects = get_promoted_courses(CNT_COURSES, sp)
     objects_ids = []
     for item in objects:
         objects_ids.append((
@@ -383,8 +419,10 @@ def update_frontpage_context(context):
     course_ids = CourseSession.objects.filter(
         course__status=PUBLISHED,
         datetime_start_enroll__lt=now,
-        datetime_end_enroll__gt=now
+        datetime_end_enroll__gt=now,
     ).values_list('course__id', flat=True).distinct()
+    if sp:
+        course_ids = course_ids.filter(course__spec_projects=sp)
     by_category, by_category_dpo = {}, {}
     for c in Category.objects.all():
         by_category[c.id] = list(CourseExtendedParameters.objects.filter(
@@ -399,6 +437,8 @@ def update_frontpage_context(context):
             status=PUBLISHED,
             courses__id__in=ids,
         ).prefetch_related('courses')
+        if sp:
+            modules = modules.filter(spec_projects=sp)
         added_module = False
         for m in modules:
             if m.may_enroll() and ('em', m.id) not in objects_ids:
@@ -417,7 +457,10 @@ def update_frontpage_context(context):
     # добавляем рандомные курсы
     if num_to_add:
         added = [i[1] for i in objects_ids]
-        for c in Course.objects.filter(status=PUBLISHED).exclude(id__in=added).order_by('?')[:num_to_add]:
+        qs = Course.objects.filter(status=PUBLISHED).exclude(id__in=added)
+        if sp:
+            qs = qs.filter(spec_projects=sp)
+        for c in qs.order_by('?')[:num_to_add]:
             objects.append({'type': 'course', 'item': course_set_attrs(c)})
 
 
@@ -429,6 +472,8 @@ def update_frontpage_context(context):
             status=PUBLISHED,
             courses__in=ids,
         ).prefetch_related('courses')
+        if sp:
+            modules = modules.filter(spec_projects=sp)
         added_module = False
         for m in modules:
             if m.may_enroll() and ('em', m.id) not in objects_dpo_ids:
@@ -502,6 +547,12 @@ def edmodule_catalog_view(request, category=None):
     course_covers: словарь, ключ - id курса, значение - объект картинки курса
     module_covers: аналогично course_covers
     """
+    sp = None
+    if request.subdomain:
+        sp = SpecProject.get_by_subdomain(request.subdomain)
+        if not sp:
+            raise Http404
+
     courses, modules, course_covers, module_covers = {}, {}, {}, {}
     cover_path = Course._meta.get_field('cover').upload_to
     try:
@@ -523,6 +574,8 @@ def edmodule_catalog_view(request, category=None):
     category_slugs_with_having_courses = set()
     courses_query = Course.objects.filter(status='published').prefetch_related(
         'extended_params', 'extended_params__authors', 'course_sessions').distinct()
+    if sp:
+        courses_query = courses_query.filter(spec_projects=sp)
     # if not category:
     #     courses_query = Course.objects.filter(status='published').prefetch_related(
     #         'extended_params', 'extended_params__authors', 'course_sessions').distinct()
@@ -561,8 +614,12 @@ def edmodule_catalog_view(request, category=None):
         dic.update({'course_status_params': get_status_dict(session)})
         courses[c.id] = dic
 
-    for m in EducationalModule.objects.filter(status='published', courses__id__in=courses.keys()).\
-            annotate(cnt_courses=Count('courses')).select_related('extended_params'):
+    count_courses_dict = dict(EducationalModule.objects.annotate(cnt=Count('courses')).values_list('code', 'cnt'))
+    edmodule_query = EducationalModule.objects.filter(status='published').\
+        select_related('extended_params')
+    if sp:
+        edmodule_query = edmodule_query.filter(spec_projects=sp)
+    for m in edmodule_query:
         if m.cover:
             cover_name = os.path.split(m.cover.name)[-1]
             if cover_name in all_module_covers:
@@ -577,10 +634,11 @@ def edmodule_catalog_view(request, category=None):
             extended = None
         categories = reduce(lambda x, y: x + y, [category_for_course.get(i.id, []) for i in m.courses.all()], [])
         categories = list(set(categories))
+        category_slugs_with_having_courses = category_slugs_with_having_courses.union(set(categories))
         dic = {
             'title': m.title,
             'authors_and_partners': [{'url': i.link, 'title': i.abbr or i.title} for i in m.get_authors_and_partners()],
-            'count_courses': m.cnt_courses,
+            'count_courses': count_courses_dict.get(m.code, 0),
             'short_description': extended and extended.short_description,
             'catalog_marker': extended and extended.catalog_marker,
             'categories': categories,
