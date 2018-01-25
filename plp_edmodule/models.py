@@ -294,7 +294,7 @@ class EducationalModule(models.Model):
         """
         c = self.courses.first()
         if c and c.next_session:
-            return c.next_session.datetime_starts
+            return c.next_session.get_start_datetime()
 
     def course_status_params(self):
         from .utils import get_status_dict

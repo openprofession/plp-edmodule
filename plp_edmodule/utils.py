@@ -158,18 +158,18 @@ def get_status_dict(session):
         status = session.course_status()
         d = {'status': status['code']}
         if status['code'] == SCHEDULED:
-            starts = timezone.localtime(session.datetime_starts).date()
+            starts = timezone.localtime(session.get_start_datetime()).date()
             d['days_before_start'] = (starts - timezone.now().date()).days
-            d['date'] = session.datetime_starts.strftime('%d.%m.%Y')
+            d['date'] = session.get_start_datetime().strftime('%d.%m.%Y')
             day, month = starts.day, months.get(starts.month)
             d['date_words'] = _(u'начало {day} {month}').format(day=day, month=month)
         elif status['code'] == STARTED:
-            ends = timezone.localtime(session.datetime_end_enroll)
+            ends = timezone.localtime(session.get_datetime_end_enroll())
             d['date'] = ends.strftime('%d.%m.%Y')
             day, month = ends.day, months.get(ends.month)
             d['date_words'] = _(u'запись до {day} {month}').format(day=day, month=month)
-        if session.datetime_end_enroll:
-            d['days_to_enroll'] = (session.datetime_end_enroll.date() - timezone.now().date()).days
+        if session.get_datetime_end_enroll():
+            d['days_to_enroll'] = (session.get_datetime_end_enroll().date() - timezone.now().date()).days
         return d
     else:
         return {'status': ''}
@@ -178,9 +178,9 @@ def get_status_dict(session):
 def choose_closest_session(c):
     sessions = c.course_sessions.all()
     if sessions:
-        sessions = filter(lambda x: x.datetime_end_enroll and x.datetime_end_enroll > timezone.now()
-                                and x.datetime_starts, sessions)
-        sessions = sorted(sessions, key=lambda x: x.datetime_end_enroll)
+        sessions = filter(lambda x: x.get_datetime_end_enroll() and x.get_datetime_end_enroll() > timezone.now()
+                                and x.get_start_datetime(), sessions)
+        sessions = sorted(sessions, key=lambda x: x.get_datetime_end_enroll())
         if sessions:
             return sessions[0]
     return None
