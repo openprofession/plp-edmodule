@@ -65,7 +65,7 @@ def enroll_button(context, course, session=None, html_location=None):
                 is_active=True
             ).select_related('upsale')
     if session:
-        materials_available = session.course_status()['code'] in [STARTED, ENDED] and session.access_allowed()
+        materials_available = session.course_status(user=user)['code'] in [STARTED, ENDED] and session.access_allowed()
     else:
         materials_available = False
     return {
