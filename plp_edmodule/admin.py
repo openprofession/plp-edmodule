@@ -11,6 +11,7 @@ from django import forms
 from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 from autocomplete_light import modelform_factory
 from statistics.admin import RemoveDeleteActionMixin
+from plp.utils.webhook import ZapierInformer
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.admin import EducationalModuleExtendedInline
 from opro_payments.admin_forms import UpsaleFormCheckerMixin
@@ -66,11 +67,20 @@ class EducationalModuleEnrollmentAdmin(admin.ModelAdmin):
     list_display = ('user', 'module', 'is_active')
     form = modelform_factory(EducationalModuleEnrollment, exclude=[])
 
+    def save_model(self, request, obj, form, change):
+        super(EducationalModuleEnrollmentAdmin, self).save_model(request, obj, form, change)
+        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enroll, request=request, module=obj.module)
+
 
 class EducationalModuleEnrollmentReasonAdmin(admin.ModelAdmin):
     search_fields = ('enrollment__user__username', 'enrollment__user__email')
     list_display = ('enrollment', 'module_enrollment_type', )
     list_filter = ('enrollment__module__code', )
+
+    def save_model(self, request, obj, form, change):
+        super(EducationalModuleEnrollmentReasonAdmin, self).save_model(request, obj, form, change)
+        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enrollreason, request=request,
+                              module=obj.module_enrollment_type.module)
 
 
 class BenefitForm(UpsaleFormCheckerMixin, forms.ModelForm):
