@@ -69,7 +69,7 @@ class EducationalModuleEnrollmentAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super(EducationalModuleEnrollmentAdmin, self).save_model(request, obj, form, change)
-        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enroll, request=request, module=obj.module)
+        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enroll, user=obj.user, module=obj.module)
 
 
 class EducationalModuleEnrollmentReasonAdmin(admin.ModelAdmin):
@@ -79,7 +79,7 @@ class EducationalModuleEnrollmentReasonAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super(EducationalModuleEnrollmentReasonAdmin, self).save_model(request, obj, form, change)
-        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enrollreason, request=request,
+        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enrollreason, user=obj.enrollment.user,
                               module=obj.module_enrollment_type.module)
 
 
