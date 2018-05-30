@@ -675,7 +675,8 @@ def enroll_on_course(session, request):
         except EDXEnrollmentError:
             return JsonResponse({'status': 0, 'error': 'edx error'})
         finally:
-            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session)
+            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session,
+                                  participant_id=participant.id)
 
     enrs = EducationalModuleEnrollment.objects.filter(user=request.user,
                                                       module__courses=session.course,
@@ -713,11 +714,12 @@ def enroll_on_course(session, request):
         except EDXEnrollmentError:
             pass
         finally:
+            participant = Participant.objects.get(session=session, user=request.user)
             if verified:
                 # если надо записать в verified mode
-                participant = Participant.objects.get(session=session, user=request.user)
                 return _add_verified_entry(participant, verified_type)
-            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session)
+            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session,
+                                  participant_id=participant.id)
             return JsonResponse({'status': 1})
 
 
