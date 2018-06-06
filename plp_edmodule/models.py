@@ -7,6 +7,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core import validators
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -58,6 +59,7 @@ class EducationalModule(models.Model):
     vacancies = models.TextField(verbose_name=_(u'Вакансии'), blank=True, default='', help_text=_(u'HTML блок'))
     subtitle = models.TextField(verbose_name=_(u'Подзаголовок'), blank=True, default='',
                                 help_text=_(u'от 1 до 3 элементов, каждый с новой строки'))
+    offer_text = models.TextField(verbose_name=_(u'Текст оферты'), default='', help_text=_(u'HTML блок'), blank=True)
     sum_ratings = models.PositiveIntegerField(verbose_name=_(u'Сумма оценок'), default=0)
     count_ratings = models.PositiveIntegerField(verbose_name=_(u'Количество оценок'), default=0)
     spec_projects = models.ManyToManyField('specproject.SpecProject', blank=True, verbose_name=_(u'Представление'))
@@ -394,6 +396,9 @@ class EducationalModule(models.Model):
                         return session, enr_type.price
                 elif enr_type:
                     return session, enr_type.price
+
+    def get_offer_url(self):
+        return reverse('op-offer-text', kwargs={'offer_type': 'edmodule', 'obj_id': self.id})
 
 
 class EducationalModuleEnrollment(models.Model):
