@@ -132,8 +132,7 @@ class BenefitAdmin(admin.ModelAdmin):
 
 
 class CoursePromotionAdmin(admin.ModelAdmin):
-    list_display = ('sort', 'content_type', 'object_id', 'content_object', 'spec_project')
-    list_filter = ('spec_project', )
+    list_display = ('sort', 'content_type', 'object_id', 'content_object')
 
 
 class PromoCodeForm(forms.ModelForm):

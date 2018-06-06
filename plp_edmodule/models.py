@@ -537,7 +537,6 @@ class CoursePromotion(models.Model):
     sort = models.SmallIntegerField(verbose_name=_(u'Приоритет'))
 
     class Meta:
-        unique_together = ('sort', 'spec_project')
         verbose_name = _(u'Порядок курсов и специализаций на главной')
         verbose_name_plural = _(u'Порядок курсов и специализаций на главной')
         ordering = ['sort']
