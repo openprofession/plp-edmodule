@@ -22,7 +22,6 @@ from plp.models import HonorCode, CourseSession, Course, Participant, Enrollment
 from plp.utils.edx_enrollment import EDXEnrollmentError
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category, CourseCreator
-from specproject.models import SpecProject
 from .models import (
     EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason,
     BenefitLink, CoursePromotion)
@@ -329,10 +328,6 @@ def update_frontpage_context(context, request):
     Обновление контекста для главной страницы
     """
     sp = None
-    if request.subdomain:
-        sp = SpecProject.get_by_subdomain(request.subdomain)
-        if not sp:
-            raise Http404
     CNT_COURSES = 5
     objects = get_promoted_courses(CNT_COURSES, sp)
     objects_ids = []
@@ -466,10 +461,6 @@ def edmodule_catalog_view(request, category=None):
     module_covers: аналогично course_covers
     """
     sp = None
-    if request.subdomain:
-        sp = SpecProject.get_by_subdomain(request.subdomain)
-        if not sp:
-            raise Http404
 
     courses, modules, course_covers, module_covers = {}, {}, {}, {}
     cover_path = Course._meta.get_field('cover').upload_to
