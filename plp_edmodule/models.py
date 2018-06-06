@@ -60,7 +60,6 @@ class EducationalModule(models.Model):
                                 help_text=_(u'от 1 до 3 элементов, каждый с новой строки'))
     sum_ratings = models.PositiveIntegerField(verbose_name=_(u'Сумма оценок'), default=0)
     count_ratings = models.PositiveIntegerField(verbose_name=_(u'Количество оценок'), default=0)
-    spec_projects = models.ManyToManyField('specproject.SpecProject', blank=True, verbose_name=_(u'Представление'))
 
     class Meta:
         verbose_name = _(u'Образовательный модуль')
@@ -536,8 +535,6 @@ class CoursePromotion(models.Model):
     content_object = GenericForeignKey('content_type', 'object_id')
     content_object.short_description = _(u'Объект')
     sort = models.SmallIntegerField(verbose_name=_(u'Приоритет'))
-    spec_project = models.ForeignKey('specproject.SpecProject', null=True, blank=True, default=None,
-                                     verbose_name=_(u'Представление'))
 
     class Meta:
         unique_together = ('sort', 'spec_project')
