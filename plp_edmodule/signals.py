@@ -69,8 +69,7 @@ def edmodule_payed_handler(**kwargs):
             'user': user,
             'site_url': get_domain_url(),
             'promocodes': kwargs.get('promocodes', []),
-            'upsale_links': kwargs.get('upsale_links', []),
-            'shop_url': getattr(settings, 'OPRO_PAYMENT_SHOP_URL', None),
+            'shop_url': getattr(settings, 'PAYMENT_SHOP_URL', None),
         }
         context.update(get_prefix_and_site())
         msg.send(context={'context': context})

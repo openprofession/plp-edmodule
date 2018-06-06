@@ -11,10 +11,8 @@ from django import forms
 from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 from autocomplete_light import modelform_factory
 from statistics.admin import RemoveDeleteActionMixin
-from plp.utils.webhook import ZapierInformer
 from plp_extension.apps.course_extension.models import CourseExtendedParameters
 from plp_extension.apps.module_extension.admin import EducationalModuleExtendedInline
-from opro_payments.admin_forms import UpsaleFormCheckerMixin
 from .utils import generate_promocode
 from .models import (
     EducationalModule,
@@ -69,8 +67,6 @@ class EducationalModuleEnrollmentAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super(EducationalModuleEnrollmentAdmin, self).save_model(request, obj, form, change)
-        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enroll, user=obj.user, module=obj.module)
-
 
 class EducationalModuleEnrollmentReasonAdmin(admin.ModelAdmin):
     search_fields = ('enrollment__user__username', 'enrollment__user__email')
@@ -79,11 +75,9 @@ class EducationalModuleEnrollmentReasonAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super(EducationalModuleEnrollmentReasonAdmin, self).save_model(request, obj, form, change)
-        ZapierInformer().push(ZapierInformer.ACTION.plp_admin_edmodule_enrollreason, user=obj.enrollment.user,
-                              module=obj.module_enrollment_type.module)
 
 
-class BenefitForm(UpsaleFormCheckerMixin, forms.ModelForm):
+class BenefitForm(forms.ModelForm):
     def clean_icon(self):
         return self._check_image('icon', max_file_size=1, types=['PNG'], max_size=(1000, 1000))
 

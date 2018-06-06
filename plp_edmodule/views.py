@@ -20,7 +20,6 @@ from django.utils.text import Truncator
 from django.views.decorators.cache import cache_page
 from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason, SessionEnrollmentType, Instructor
 from plp.utils.edx_enrollment import EDXEnrollmentError
-from plp.utils.webhook import ZapierInformer
 from plp.views.course import _enroll
 from plp_extension.apps.course_extension.models import CourseExtendedParameters, Category, CourseCreator
 from specproject.models import SpecProject
@@ -108,14 +107,6 @@ def module_page(request, code):
     # TODO: catalog_link
     # catalog_link = reverse('modules_catalog') + '?' + '&'.join(['cat=%s' % i.code for i in module.categories])
     catalog_link = ''
-    upsale_links = []
-    if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
-        from opro_payments.models import UpsaleLink
-        upsale_links = UpsaleLink.objects.filter(
-            object_id=module.id,
-            content_type=ContentType.objects.get_for_model(module),
-            is_active=True,
-        ).select_related('upsale')
     try:
         session, price = module.get_first_session_to_buy(request.user)
     except TypeError:
@@ -137,7 +128,6 @@ def module_page(request, code):
         'feedback_list': get_feedback_list(module),
         'instructors': module.instructors,
         'authenticated': request.user.is_authenticated(),
-        'upsale_links': upsale_links,
         'enrollment_reason': module.get_enrollment_reason_for_user(request.user),
         'first_session': session,
         'first_session_price': price,
@@ -201,34 +191,10 @@ def update_context_with_modules(context, user):
     current = context['courses_current']
     finished = context['courses_finished']
     future = context['courses_feature']
-    upsales_for_session = defaultdict(list)
-    upsales_for_module = defaultdict(list)
     obj_enrollments_for_session = defaultdict(list)
     obj_enrollments_for_module = defaultdict(list)
     modules_courses_ids = list(modules.values_list('courses__course_sessions__id', flat=True))
     modules_courses_ids = filter(lambda x: x, modules_courses_ids)
-    if getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
-        from opro_payments.models import UpsaleLink, ObjectEnrollment
-        course_ids = [i.id for i in (finished + future + current)]
-        course_ids = list(set(course_ids).union(set(modules_courses_ids)))
-        ctype = ContentType.objects.get_for_model(CourseSession)
-        ctype_module = ContentType.objects.get_for_model(EducationalModule)
-        upsale_links = UpsaleLink.objects.filter(content_type=ctype, object_id__in=course_ids, is_active=True)
-        module_upsale_links = UpsaleLink.objects.filter(content_type=ctype_module,
-                                                        object_id__in=[i.id for i in modules], is_active=True)
-        for i in upsale_links:
-            upsales_for_session[i.object_id].append(i)
-        for i in module_upsale_links:
-            upsales_for_module[i.object_id].append(i)
-        obj_enrollments = ObjectEnrollment.objects.filter(upsale__in=upsale_links, user=user).select_related('upsale')
-        module_obj_enrollments = ObjectEnrollment.objects.filter(upsale__in=module_upsale_links, user=user).select_related('upsale')
-        for i in obj_enrollments:
-            obj_enrollments_for_session[i.upsale.object_id].append(i.upsale)
-        for i in module_obj_enrollments:
-            obj_enrollments_for_module[i.upsale.object_id].append(i.upsale)
-    for i in (current + future + finished):
-        i.upsales = upsales_for_session.get(i.id)
-        i.bought_upsales = obj_enrollments_for_session.get(i.id)
     sessions_for_course = defaultdict(list)
     available_sessions_for_course = defaultdict(list)
     for cs in CourseSession.objects.filter(id__in=modules_courses_ids).order_by('datetime_starts'):
@@ -254,8 +220,6 @@ def update_context_with_modules(context, user):
     for module in context['modules']:
         all_courses = module.courses.all()
         module.all_courses = zip(all_courses, [c.next_session for c in all_courses])
-        module.upsales = upsales_for_module.get(module.id, [])
-        module.bought_upsales = obj_enrollments_for_module.get(module.id, [])
         for attr in ['courses_current', 'courses_finished', 'courses_feature']:
             setattr(module, attr, [])
         for index, (course, __) in enumerate(module.all_courses, 1):
@@ -271,8 +235,6 @@ def update_context_with_modules(context, user):
                     session.has_honor_mode = bool(session.honor_mode_enrollment_type)
                 else:
                     session.has_honor_mode = True
-                session.upsales = upsales_for_session.get(session.id)
-                session.bought_upsales = obj_enrollments_for_session.get(session.id)
                 if session.participant:
                     _assign_module_tab(module, session, course)
                     _remove_duplicates(session, without_duplicates.values())
@@ -335,12 +297,6 @@ def update_course_details_context(context, user):
     modules = EducationalModule.objects.filter(courses=context['object']).distinct()
     context['modules'] = modules
     session = context['session']
-    if session and getattr(settings, 'ENABLE_OPRO_PAYMENTS', False):
-        from opro_payments.models import UpsaleLink
-        ctype = ContentType.objects.get_for_model(session)
-        upsale_links = UpsaleLink.objects.filter(content_type=ctype, object_id=session.id, is_active=True)\
-            .select_related('upsale')
-        context.update({'upsale_links': upsale_links})
     try:
         course_extended = context['object'].extended_params
         authors = list(course_extended.authors.all())
@@ -661,7 +617,7 @@ def edmodule_catalog_view(request, category=None):
 
 def enroll_on_course(session, request):
     """
-    обработка стандартного метода записи на курс для openprofession
+    обработка стандартного метода записи на курс
     """
     def _add_verified_entry(participant, verified_type):
         try:
@@ -674,9 +630,6 @@ def enroll_on_course(session, request):
             return JsonResponse({'status': 1})
         except EDXEnrollmentError:
             return JsonResponse({'status': 0, 'error': 'edx error'})
-        finally:
-            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session,
-                                  participant_id=participant.id)
 
     enrs = EducationalModuleEnrollment.objects.filter(user=request.user,
                                                       module__courses=session.course,
@@ -718,8 +671,6 @@ def enroll_on_course(session, request):
             if verified:
                 # если надо записать в verified mode
                 return _add_verified_entry(participant, verified_type)
-            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session,
-                                  participant_id=participant.id)
             return JsonResponse({'status': 1})
 
 

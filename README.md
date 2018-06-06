@@ -1,7 +1,6 @@
 ## Установка
 
     Установить в plp:
-    pip install -e https://github.com/openprofession/plp-edmodule@master#egg=plp_edmodule
-    Запускать plp с настройками из файла openprof_example.py
+    pip install -e git+https://gitlab.oeplatform.ru/generic-platform/plp-edmodule@tp_archive#egg=plp_edmodule
     Добавить 'sortedm2m' в INSTALLED_APPS
  
