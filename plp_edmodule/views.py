@@ -8,6 +8,7 @@ from collections import defaultdict
 from django.conf import settings
 from django.db.models import Count
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.storage import default_storage
 from django.core.urlresolvers import reverse
 from django.http import JsonResponse, Http404
@@ -26,7 +27,7 @@ from plp_extension.apps.course_extension.models import CourseExtendedParameters,
 from specproject.models import SpecProject
 from .models import (
     EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason,
-    BenefitLink, CoursePromotion)
+    BenefitLink, CoursePromotion, EducationalModuleEnrollmentType)
 from .utils import (update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict,
     count_user_score, update_modules_graduation, choose_closest_session)
 from .signals import edmodule_enrolled
@@ -120,6 +121,17 @@ def module_page(request, code):
         session, price = module.get_first_session_to_buy(request.user)
     except TypeError:
         session, price = None, None
+    try:
+        verified = EducationalModuleEnrollmentType.objects.get(module=module, active=True, mode='verified')
+    except ObjectDoesNotExist:
+        raise Exception("No price for education module with id={}".format(module.id))
+
+    price_data = module.get_price_list(request.user)
+    try:
+        verified_discount = '%.2f' % round(100 - float(verified.price) / float(price_data['price']) * 100, 2)
+    except ZeroDivisionError:
+        verified_discount = 0
+
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
         'courses': [course_set_attrs(i) for i in module.courses.all()],
@@ -128,7 +140,7 @@ def module_page(request, code):
         'authors_and_partners': module.get_authors_and_partners(),
         'profits': module.get_module_profit(),
         'related': module.get_related(),
-        'price_data': module.get_price_list(request.user),
+        'price_data': price_data,
         'schedule': module.get_schedule(),
         'rating': module.get_rating(),
         'count_ratings': module.count_ratings,
@@ -142,6 +154,8 @@ def module_page(request, code):
         'first_session': session,
         'first_session_price': price,
         'benefit_links': BenefitLink.get_benefits_for_object(module),
+        'verified_price': verified.price,
+        'verified_discount': verified_discount
     })
 
 

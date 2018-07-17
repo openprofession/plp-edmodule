@@ -634,6 +634,15 @@ class PromoCode(models.Model):
 
             price = edmodule.get_price_list()
 
+            try:
+                verified = EducationalModuleEnrollmentType.objects.get(module=product_id, active=True, mode='verified')
+                edmodule_price = verified.price
+            except ObjectDoesNotExist:
+                return {
+                    'status': 1,
+                    'message': unicode(_(u'Не удалось найти цену специализации'))
+                }            
+
             if only_first_course == True:
                 first_course_price = edmodule.get_first_session_to_buy(None)[1]
                 price['price'] = first_course_price
@@ -641,19 +650,20 @@ class PromoCode(models.Model):
             
             if self.use_with_others:
                 full_discount = self.discount_percent + Decimal(price['discount'])
-                new_price = Decimal(price['price']) * (1 - full_discount / 100)
+                new_price = Decimal(edmodule_price) * (1 - full_discount / 100)
                 return {
                     'status': 0,
                     'new_price': new_price.quantize(Decimal('.00'))
                 }    
             else:
                 if Decimal(price['discount']) > self.discount_percent:
+                    new_price = Decimal(edmodule_price) * (1 - price['discount'] / 100)
                     return {
                         'status': 0,
-                        'new_price': Decimal(price['whole_price']).quantize(Decimal('.00'))
+                        'new_price': Decimal(new_price).quantize(Decimal('.00'))
                     }  
                 else:
-                    new_price = Decimal(price['price']) * (1 - self.discount_percent / 100)
+                    new_price = Decimal(edmodule_price) * (1 - self.discount_percent / 100)
                     return {
                         'status': 0,
                         'new_price': new_price.quantize(Decimal('.00'))
