@@ -76,6 +76,7 @@ class EducationalModuleEnrollmentReasonAdmin(admin.ModelAdmin):
     search_fields = ('enrollment__user__username', 'enrollment__user__email')
     list_display = ('enrollment', 'module_enrollment_type', )
     list_filter = ('enrollment__module__code', )
+    raw_id_fields = ('enrollment',)
 
     def save_model(self, request, obj, form, change):
         super(EducationalModuleEnrollmentReasonAdmin, self).save_model(request, obj, form, change)
