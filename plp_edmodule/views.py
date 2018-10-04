@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.html import strip_tags, strip_spaces_between_tags
 from django.utils.text import Truncator
+from django.utils.translation import ugettext as _
 from django.views.decorators.cache import cache_page
 from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason, SessionEnrollmentType, Instructor
 from plp.utils.edx_enrollment import EDXEnrollmentError
@@ -265,6 +266,10 @@ def update_context_with_modules(context, user):
         'courses_feature': future[:]
     }
     update_modules_graduation(user, context['courses_finished'])
+
+    special_modules = [i.lower() for i in getattr(settings, 'EDMODULE_WITH_WARNING', [])]
+    warning_msg = getattr(settings, 'EDMODULE_WARNING_MSG',
+                          _(u'Записывайтесь на курс только после того, как завершили предыдущий'))
     for module in context['modules']:
         all_courses = module.courses.all()
         module.all_courses = zip(all_courses, [c.next_session for c in all_courses])
@@ -276,6 +281,7 @@ def update_context_with_modules(context, user):
             course.available_sessions = available_sessions_for_course[course.id]
             course.index = index
             course.has_module = True
+            enrolled_for_course = False
             for session in sessions_for_course[course.id]:
                 session.participant = participant_for_session.get(session.id)
                 session.paid_enrollment = paid_enrollment_for_session.get(session.id)
@@ -290,6 +296,11 @@ def update_context_with_modules(context, user):
                 if session.participant:
                     _assign_module_tab(module, session, course)
                     _remove_duplicates(session, without_duplicates.values())
+                    enrolled_for_course = True
+            # SUPP-128
+            if module.code.lower() in special_modules and not enrolled_for_course and index > 1:
+                course.show_special_message = warning_msg
+
     all_courses = reduce(lambda x, y: x + y, without_duplicates.values(), [])
     without_duplicates['all_courses'] = all_courses
     context.update(without_duplicates)
