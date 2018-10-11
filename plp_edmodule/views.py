@@ -8,6 +8,7 @@ from collections import defaultdict
 from django.conf import settings
 from django.db.models import Count
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.storage import default_storage
 from django.core.urlresolvers import reverse
 from django.http import JsonResponse, Http404
@@ -17,6 +18,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.html import strip_tags, strip_spaces_between_tags
 from django.utils.text import Truncator
+from django.utils.translation import ugettext as _
 from django.views.decorators.cache import cache_page
 from plp.models import HonorCode, CourseSession, Course, Participant, EnrollmentReason, SessionEnrollmentType, Instructor
 from plp.utils.edx_enrollment import EDXEnrollmentError
@@ -26,7 +28,7 @@ from plp_extension.apps.course_extension.models import CourseExtendedParameters,
 from specproject.models import SpecProject
 from .models import (
     EducationalModule, EducationalModuleEnrollment, PUBLISHED, HIDDEN, EducationalModuleEnrollmentReason,
-    BenefitLink, CoursePromotion)
+    BenefitLink, CoursePromotion, EducationalModuleEnrollmentType)
 from .utils import (update_module_enrollment_progress, client, get_feedback_list, course_set_attrs, get_status_dict,
     count_user_score, update_modules_graduation, choose_closest_session)
 from .signals import edmodule_enrolled
@@ -120,6 +122,17 @@ def module_page(request, code):
         session, price = module.get_first_session_to_buy(request.user)
     except TypeError:
         session, price = None, None
+    try:
+        verified = EducationalModuleEnrollmentType.objects.get(module=module, active=True, mode='verified')
+    except ObjectDoesNotExist:
+        raise Exception("No price for education module with id={}".format(module.id))
+
+    price_data = module.get_price_list(request.user)
+    try:
+        verified_discount = '%.2f' % round(100 - float(verified.price) / float(price_data['price']) * 100, 2)
+    except ZeroDivisionError:
+        verified_discount = 0
+
     return render(request, 'edmodule/edmodule_page.html', {
         'object': module,
         'courses': [course_set_attrs(i) for i in module.courses.all()],
@@ -128,7 +141,7 @@ def module_page(request, code):
         'authors_and_partners': module.get_authors_and_partners(),
         'profits': module.get_module_profit(),
         'related': module.get_related(),
-        'price_data': module.get_price_list(request.user),
+        'price_data': price_data,
         'schedule': module.get_schedule(),
         'rating': module.get_rating(),
         'count_ratings': module.count_ratings,
@@ -142,6 +155,8 @@ def module_page(request, code):
         'first_session': session,
         'first_session_price': price,
         'benefit_links': BenefitLink.get_benefits_for_object(module),
+        'verified_price': verified.price,
+        'verified_discount': verified_discount
     })
 
 
@@ -251,6 +266,10 @@ def update_context_with_modules(context, user):
         'courses_feature': future[:]
     }
     update_modules_graduation(user, context['courses_finished'])
+
+    special_modules = [i.lower() for i in getattr(settings, 'EDMODULE_WITH_WARNING', [])]
+    warning_msg = getattr(settings, 'EDMODULE_WARNING_MSG',
+                          _(u'Записывайтесь на курс только после того, как завершили предыдущий'))
     for module in context['modules']:
         all_courses = module.courses.all()
         module.all_courses = zip(all_courses, [c.next_session for c in all_courses])
@@ -262,6 +281,7 @@ def update_context_with_modules(context, user):
             course.available_sessions = available_sessions_for_course[course.id]
             course.index = index
             course.has_module = True
+            enrolled_for_course = False
             for session in sessions_for_course[course.id]:
                 session.participant = participant_for_session.get(session.id)
                 session.paid_enrollment = paid_enrollment_for_session.get(session.id)
@@ -276,6 +296,11 @@ def update_context_with_modules(context, user):
                 if session.participant:
                     _assign_module_tab(module, session, course)
                     _remove_duplicates(session, without_duplicates.values())
+                    enrolled_for_course = True
+            # SUPP-128
+            if module.code.lower() in special_modules and not enrolled_for_course and index > 1:
+                course.show_special_message = warning_msg
+
     all_courses = reduce(lambda x, y: x + y, without_duplicates.values(), [])
     without_duplicates['all_courses'] = all_courses
     context.update(without_duplicates)
@@ -675,7 +700,8 @@ def enroll_on_course(session, request):
         except EDXEnrollmentError:
             return JsonResponse({'status': 0, 'error': 'edx error'})
         finally:
-            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session)
+            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session,
+                                  participant_id=participant.id)
 
     enrs = EducationalModuleEnrollment.objects.filter(user=request.user,
                                                       module__courses=session.course,
@@ -713,11 +739,12 @@ def enroll_on_course(session, request):
         except EDXEnrollmentError:
             pass
         finally:
+            participant = Participant.objects.get(session=session, user=request.user)
             if verified:
                 # если надо записать в verified mode
-                participant = Participant.objects.get(session=session, user=request.user)
                 return _add_verified_entry(participant, verified_type)
-            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session)
+            ZapierInformer().push(ZapierInformer.ACTION.plp_course_enroll, request=request, session=session,
+                                  participant_id=participant.id)
             return JsonResponse({'status': 1})
 
 
