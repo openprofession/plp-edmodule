@@ -680,6 +680,7 @@ def edmodule_catalog_view(request, category=None):
         'modules': json.dumps(modules, ensure_ascii=False),
         'course_covers': course_covers,
         'module_covers': module_covers,
+        'force_sort': (sp and sp.slug or None) in getattr(settings, 'FORCE_CATALOG_ALPHABETICAL_SORT', []),
     }
     return render(request, 'edmodule/catalog.html', context)
 
